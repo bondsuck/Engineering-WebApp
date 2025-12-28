@@ -5,7 +5,7 @@ interface Props {
     df: number; // m
     q_max: number; // T/m2
     q_min: number; // T/m2
-
+    rebarX?: string; // Optional prop, not used in visual but passed
 }
 
 const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min }: Props) => {
@@ -22,7 +22,6 @@ const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min }: Props) =
     const ftgBotY = ftgTopY + H_ftg;
     const centerX = padding + W/2;
 
-    // Soil Pressure Diagram (Scaled)
     const p_scale = 40 / Math.max(q_max, 1);
     const h_p_left = q_min * p_scale;
     const h_p_right = q_max * p_scale;
@@ -49,7 +48,7 @@ const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min }: Props) =
                     fill="#e2e8f0" stroke="#334155" strokeWidth="2"
                 />
 
-                {/* 4. Rebar (Main + Transverse) */}
+                {/* 4. Rebar */}
                 <line 
                     x1={padding + 10} y1={ftgBotY - 10} 
                     x2={padding + W - 10} y2={ftgBotY - 10} 
@@ -63,36 +62,25 @@ const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min }: Props) =
                     <circle cx={padding + W - 20} cy={ftgBotY - 18} r="3" />
                 </g>
 
-                {/* 5. Soil Pressure Gradient */}
+                {/* 5. Pressure */}
                 <path 
-                    d={`
-                        M${padding} ${ftgBotY} 
-                        L${padding} ${ftgBotY + h_p_left} 
-                        L${padding + W} ${ftgBotY + h_p_right} 
-                        L${padding + W} ${ftgBotY} 
-                        Z
-                    `} 
+                    d={`M${padding} ${ftgBotY} L${padding} ${ftgBotY + h_p_left} L${padding + W} ${ftgBotY + h_p_right} L${padding + W} ${ftgBotY} Z`} 
                     fill="url(#soilGradient)" stroke="#f59e0b" strokeWidth="1" opacity="0.8"
                 />
                 
-                {/* Pressure Arrows */}
                 <line x1={padding} y1={ftgBotY+h_p_left} x2={padding} y2={ftgBotY} stroke="#f59e0b" markerEnd="url(#arrow)" />
                 <line x1={padding+W} y1={ftgBotY+h_p_right} x2={padding+W} y2={ftgBotY} stroke="#f59e0b" markerEnd="url(#arrow)" />
 
-                {/* Values */}
                 <text x={padding} y={ftgBotY + h_p_left + 15} textAnchor="middle" fontSize="10" fill="#b45309">{q_min.toFixed(1)}</text>
                 <text x={padding + W} y={ftgBotY + h_p_right + 15} textAnchor="middle" fontSize="10" fill="#b45309">{q_max.toFixed(1)} T/m²</text>
 
-                {/* 6. Dimensions */}
-                {/* Df */}
+                {/* Dimensions */}
                 <line x1={padding - 10} y1={groundY} x2={padding - 10} y2={ftgBotY} stroke="#64748b" markerStart="url(#tick)" markerEnd="url(#tick)" />
                 <text x={padding - 15} y={(groundY+ftgBotY)/2} textAnchor="end" fontSize="10" fill="#64748b">Df = {df.toFixed(2)}m</text>
                 
-                {/* Thickness */}
                 <line x1={padding + W + 10} y1={ftgTopY} x2={padding + W + 10} y2={ftgBotY} stroke="#64748b" markerStart="url(#tick)" markerEnd="url(#tick)" />
                 <text x={padding + W + 15} y={(ftgTopY+ftgBotY)/2} textAnchor="start" fontSize="10" fill="#64748b">t = {thickness}cm</text>
 
-                {/* Defs */}
                 <defs>
                     <linearGradient id="soilGradient" x1="0" x2="0" y1="0" y2="1">
                         <stop offset="0%" stopColor="#fcd34d" stopOpacity="0.5" />

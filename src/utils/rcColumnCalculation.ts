@@ -47,13 +47,13 @@ export interface ColumnResult {
 }
 
 // Helper Functions
-const getEc = (fc: number) => 15100 * Math.sqrt(fc);
+const getEc = (fc: number) => CONSTANTS.STEEL.Ec_formula(fc);
 const fmt = (n: number, d: number = 2) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 const getBeta1 = (fc: number) => {
-    if (fc <= 280) return 0.85;
-    const beta = 0.85 - 0.05 * (fc - 280) / 70;
-    return Math.max(0.65, beta);
+    if (fc <= CONSTANTS.CONCRETE.BETA1_BREAKPOINT_KSC) return CONSTANTS.CONCRETE.BETA1_BASE;
+    const beta = CONSTANTS.CONCRETE.BETA1_BASE - 0.05 * (fc - CONSTANTS.CONCRETE.BETA1_BREAKPOINT_KSC) / 70;
+    return Math.max(CONSTANTS.CONCRETE.BETA1_MIN, beta);
 };
 
 const getPhiAxial = (epsilon_t: number, std: Standard) => {
@@ -97,7 +97,7 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
     const fy_main = REBAR_GRADES[mainBarGrade] || 4000;
     const fy_stir = REBAR_GRADES[stirrupGrade] || 2400;
     const fy_steel = STRUCTURAL_STEEL_GRADES[steelGrade] || 2400;
-    const Es_steel = 2040000;
+    const Es_steel = CONSTANTS.STEEL.Es_ksc;
 
     // --- Geometry Properties ---
     const Ag = bx * by; 
@@ -288,13 +288,13 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
 
     // BOQ
     const volConcrete = (bx * by / 10000) * L;
-    const weightRebar = (As_total_rebar / 10000 * L) * 7850;
-    const weightSteel = (As_struct / 10000 * L) * 7850;
+    const weightRebar = (As_total_rebar / 10000 * L) * CONSTANTS.MATERIAL_WEIGHTS.STEEL;
+    const weightSteel = (As_struct / 10000 * L) * CONSTANTS.MATERIAL_WEIGHTS.STEEL;
     const areaForm = 2 * (bx + by) / 100 * L;
     const perimeterCore = 2 * (bx - 2 * covering) + 2 * (by - 2 * covering);
     const lenPerStirrup = (perimeterCore + 20) / 100;
     const numStirrups = Math.ceil((L * 100) / stirrupSpacing) + 1;
-    const weightStirrup = lenPerStirrup * numStirrups * (Math.PI * Math.pow(stirrupSize/1000,2)/4 * 7850); 
+    const weightStirrup = lenPerStirrup * numStirrups * (Math.PI * Math.pow(stirrupSize/1000,2)/4 * CONSTANTS.MATERIAL_WEIGHTS.STEEL); 
     const estCost = (volConcrete * MATERIAL_COSTS.CONCRETE_M3) + 
                     (weightRebar * MATERIAL_COSTS.REBAR_KG) + 
                     (weightStirrup * MATERIAL_COSTS.REBAR_KG) + 
@@ -339,25 +339,24 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
     });
 
     // 4. Shear Design (Detailed)
-    const d_eff = by - covering;
-    const Vu = Math.sqrt(critLoad.Vx**2 + critLoad.Vy**2);
-    const Nu = critLoad.Pu * 1000;
-    const axial_factor = Nu > 0 ? (1 + Nu / (140 * Ag)) : 1.0;
-    const Vc_ton = (0.53 * Math.sqrt(fc) * bx * d_eff * axial_factor) / 1000;
+    const d_shear_eff = by - covering;
+    const Vu_kg = Math.sqrt(critLoad.Vx**2 + critLoad.Vy**2) * 1000;
+    const Nu_kg = critLoad.Pu * 1000;
+    const axial_factor_shear = Nu_kg > 0 ? (1 + Nu_kg / (140 * Ag)) : 1.0;
+    const Vc_ton = (0.53 * Math.sqrt(fc) * bx * d_shear_eff * axial_factor_shear) / 1000;
     const phi = standard === 'ACI318-19' ? CONSTANTS.PHI.ACI318_19.SHEAR : CONSTANTS.PHI.EIT.SHEAR;
     const phiVc = phi * Vc_ton;
 
     const shearContent = [
-        `<b>${t.shearLoad}:</b> Vu = ${fmt(Vu,2)} T`,
+        `<b>${t.shearLoad}:</b> Vu = ${fmt(Vu_kg/1000,2)} T`,
         `<b>${t.concCap}:</b> Vc = 0.53√fc bd(1+Nu/140Ag) = <b>${fmt(Vc_ton,2)} T</b>`,
         `&nbsp;&nbsp; φVc = ${phi} * ${fmt(Vc_ton,2)} = <b>${fmt(phiVc,2)} T</b>`
     ];
 
-    if (Vu > phiVc) {
+    if (Vu_kg/1000 > phiVc) {
         shearContent.push(`<b>${t.stirrupReq}:</b> Vu > φVc -> Stirrups Required`);
         shearContent.push(`&nbsp;&nbsp; As Required = <b>${fmt(criticalRes.As_req,2)} cm²</b> (for s=${stirrupSpacing} cm)`);
     } else {
-        // ✅ 1. แสดงสมการ Min Reinforcement เมื่อ Vu < phiVc
         shearContent.push(`<b>${t.stirrupReq}:</b> Vu < φVc -> Min. Reinforcement Check`);
         const Av_min_1 = (0.2 * Math.sqrt(fc) * bx * stirrupSpacing) / fy_stir;
         const Av_min_2 = (3.5 * bx * stirrupSpacing) / fy_stir;
@@ -366,8 +365,7 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
         shearContent.push(`&nbsp;&nbsp; Av,min = Max(0.2√fc bw s/fy, 3.5 bw s/fy)`);
         shearContent.push(`&nbsp;&nbsp; = Max(${fmt(Av_min_1,2)}, ${fmt(Av_min_2,2)}) = <b>${fmt(Av_min_req,2)} cm²</b>`);
         
-        // ถ้า As_req ที่คำนวณมาเป็น 0 (เพราะ Vu ต่ำมาก) ให้ใช้ค่า Av_min แสดงแทนใน Report เพื่อความถูกต้องตาม Code
-        if (criticalRes.As_req < Av_min_req && Vu > phiVc/2) {
+        if (criticalRes.As_req < Av_min_req && Vu_kg/1000 > phiVc/2) {
              shearContent.push(`&nbsp;&nbsp; Use Min Area: <b>${fmt(Av_min_req,2)} cm²</b>`);
         }
     }
@@ -376,7 +374,7 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
 
     reportSteps.push({ title: t.step4, content: shearContent });
 
-// ✅ 2. Torsion Check Section (Fix: Use Constants)
+    // 5. Torsion
     const Acp = bx * by;
     const Pcp = 2 * (bx + by);
     const Tth = (0.27 * Math.sqrt(fc) * Math.pow(Acp, 2) / Pcp) / 100000; // T-m
@@ -384,13 +382,13 @@ export const calculateColumnDesign = (input: ColumnInput, lang: Language): Colum
     const phiTth = phi_torsion * Tth;
 
     reportSteps.push({
-        title: t.torsionTitle, // ✅ ดึงจาก Constant
+        title: t.torsionTitle,
         content: [
-            `<b>${t.threshold}:</b> ~ 0.27√fc Acp²/Pcp`, // ✅ ดึงจาก Constant
+            `<b>${t.threshold}:</b> ~ 0.27√fc Acp²/Pcp`,
             `&nbsp;&nbsp; Acp = ${fmt(Acp,0)} cm², Pcp = ${fmt(Pcp,0)} cm`,
             `&nbsp;&nbsp; Tth = ${fmt(Tth,3)} T-m -> φTth = <b>${fmt(phiTth,3)} T-m</b>`,
-            `<b>${t.check}:</b> Tu (Input) = 0.00 T-m`, // ✅ ใช้ t.check ที่มีอยู่แล้ว
-            `&nbsp;&nbsp; Tu < φTth -> <b>${t.torsionNeglect}</b>` // ✅ ดึงจาก Constant
+            `<b>${t.check}:</b> Tu (Input) = 0.00 T-m`,
+            `&nbsp;&nbsp; Tu < φTth -> <b>${t.torsionNeglect}</b>`
         ]
     });
 
@@ -432,7 +430,7 @@ export const calculateBasePlate = (Pu: number, Mu: number, B_plate: number, N_pl
 };
 
 export const calculateShearStuds = (fc: number, stud_dia_mm: number, stud_fu: number, total_shear_ton: number, length_m: number) => {
-    const Ec = 15100 * Math.sqrt(fc);
+    const Ec = CONSTANTS.STEEL.Ec_formula(fc);
     const Asc = Math.PI * Math.pow(stud_dia_mm/10, 2) / 4.0;
     const Rg = 1.0, Rp = 0.75;
     const term1 = 0.5 * Asc * Math.sqrt(fc * Ec);

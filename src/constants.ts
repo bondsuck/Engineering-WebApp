@@ -25,7 +25,7 @@ export const THEME = {
     COLORS: {
         PASS: "#10b981", FAIL: "#ef4444", BLUE: "#3b82f6", YELLOW: "#eab308",
         GRID: "#334155", TEXT: "#94a3b8", BG_TOOLTIP: "#0f172a",
-        REBAR_MAIN: "#ef4444", REBAR_STIRRUP: "#3b82f6", CONCRETE: "#334155" // ✅ เพิ่มสีสำหรับ Section View
+        REBAR_MAIN: "#ef4444", REBAR_STIRRUP: "#3b82f6", CONCRETE: "#334155"
     }
 };
 
@@ -59,25 +59,42 @@ export const TYPO = {
 export const CONSTANTS = {
     CONV_KSC_TO_MPA: 0.0980665, CONV_N_TO_KG: 1 / 9.80665,
     MIN_CLEAR_SPACING_CM: 2.5, STIRRUP_STEP_CM: 2.5, BRESLER_ALPHA: 1.5,
-    // ✅ เพิ่ม Engineering Constants
+    
+    // ✅ เพิ่ม Material Weights (kg/m3)
+    MATERIAL_WEIGHTS: {
+        CONCRETE: 2400,
+        STEEL: 7850,
+        WATER: 1000
+    },
+
+    // ✅ เพิ่ม Steel Properties
+    STEEL: {
+        Es_ksc: 2040000,
+        Ec_formula: (fc: number) => 15100 * Math.sqrt(fc) // ACI metric approx
+    },
+
+    // ✅ เพิ่ม Estimation Factors
+    ESTIMATION: {
+        REBAR_KG_PER_M3_STAIR: 120,
+        REBAR_WASTE: 1.10 // 10% waste
+    },
+
     CONCRETE: {
         BETA1_BREAKPOINT_KSC: 280,
         BETA1_BASE: 0.85,
         BETA1_MIN: 0.65,
-        LAMBDA_LIGHTWEIGHT: 1.0 // Assume Normal Weight (Comment in Calculation)
+        LAMBDA_LIGHTWEIGHT: 1.0 
     },
     PHI: {
         ACI318_19: { FLEXURE_MAX: 0.90, FLEXURE_MIN: 0.65, SHEAR: 0.75, COMPRESSION_TIED: 0.65, COMPRESSION_SPIRAL: 0.75, TORSION: 0.75 },
-        EIT: { FLEXURE_MAX: 0.90, FLEXURE_MIN: 0.90, SHEAR: 0.85, COMPRESSION_TIED: 0.70, COMPRESSION_SPIRAL: 0.75, TORSION: 0.85 } // EIT Flexure often constant 0.90 but can be checked
+        EIT: { FLEXURE_MAX: 0.90, FLEXURE_MIN: 0.90, SHEAR: 0.85, COMPRESSION_TIED: 0.70, COMPRESSION_SPIRAL: 0.75, TORSION: 0.85 } 
     },
-    // ✅ จุดที่ Error: ต้องมีตัวนี้
     LOAD_FACTORS: {
         ACI318_19: { DL: 1.2, LL: 1.6 },
         EIT: { DL: 1.4, LL: 1.7 }
     }
 };
 
-// ✅ เพิ่ม Config สำหรับ Free User (แก้ Hardcoding)
 export const FREE_USER_CONFIG = {
     ALLOWED_MAIN_GRADES: ['SD30', 'SR24'],
     ALLOWED_STIRRUP_GRADES: ['SR24']
@@ -86,12 +103,14 @@ export const FREE_USER_CONFIG = {
 export const MATERIAL_COSTS = { CONCRETE_M3: 2400, REBAR_KG: 30, STEEL_KG: 35, FORMWORK_M2: 400 };
 export const REBAR_GRADES: Record<string, number> = { "SR24": 2400, "SD30": 3000, "SD40": 4000, "SD50": 5000 };
 export const STRUCTURAL_STEEL_GRADES: Record<string, number> = { "SS400": 2400, "SM520": 3600, "ASTM A36": 2500, "ASTM A572 Gr50": 3450 };
+
 export const GRADE_PROPERTIES: Record<SteelGrade, { fy: number; type: 'RB'|'DB'; sizes: number[] }> = {
     "SR24": { fy: 2400, type: 'RB', sizes: [6, 9, 12] },
     "SD30": { fy: 3000, type: 'DB', sizes: [10, 12, 16, 20, 25, 28, 32] },
     "SD40": { fy: 4000, type: 'DB', sizes: [10, 12, 16, 20, 25, 28, 32] },
     "SD50": { fy: 5000, type: 'DB', sizes: [10, 12, 16, 20, 25, 28, 32] },
 };
+
 export const H_BEAM_STD: Record<string, any> = {
     "None": null,
     "H-100x100": { d: 100, bf: 100, tw: 6, tf: 8, Ix: 374, Iy: 134, w: 17.2 },
@@ -175,15 +194,13 @@ export const UI_TEXT = {
                 cx: "Col X", cy: "Col Y", thk: "Thickness", cov: "Covering",
                 barX: "Main Bar X", barY: "Main Bar Y", stirrup: "Binder (Stirrup)",
                 sx: "@ Spacing", sy: "@ Spacing", 
-                // ✅ แก้ไขป้ายชื่อ (EN)
-                spacing: "Spacing Factor (c/c)", 
-                edge: "Edge Factor (Center-to-Edge)",
+                spacing: "Spacing Factor (c/c) (x*d)", 
+                edge: "Edge Factor (Center-to-Edge) (x*d)",
                 embed: "Pile Embedment",
                 topBar: "Include Top Bar", expand: "Auto-expand Cap Size",
-                deepOption: "Consider Deep Beam Action", // ✅ เพิ่ม
+                deepOption: "Consider Deep Beam Action",
             },
             report: {
-                // ... (คงเดิม)
                 step1: "1. Design Parameters",
                 step2: "2. Pile Reactions",
                 step3: "3. Structural Design (X-Axis)",
@@ -211,7 +228,7 @@ export const UI_TEXT = {
                 fc: "Concrete (fc')", fy: "Steel (fy)",
                 case: "Support Condition", bar: "Main Bar", spa: "Spacing",
                 expand: "Auto Expand",
-                cantilever: "Cantilever (Overhang)" // ✅ NEW
+                cantilever: "Cantilever (Overhang)"
             },
             report: {
                 step1: "1. Design Parameters",
@@ -291,15 +308,13 @@ export const UI_TEXT = {
                 cx: "ตอม่อ X", cy: "ตอม่อ Y", thk: "ความหนา", cov: "ระยะหุ้ม",
                 barX: "เหล็กแกน X", barY: "เหล็กแกน Y", stirrup: "เหล็กรัดรอบ",
                 sx: "@ ระยะเรียง", sy: "@ ระยะเรียง",
-                // ✅ แก้ไขป้ายชื่อ (TH) ให้ชัดเจน
                 spacing: "ระยะห่างเข็ม (c/c) (x เท่าของ d)", 
                 edge: "ระยะขอบ (จากกึ่งกลาง) (x เท่าของ d)",
                 embed: "ระยะฝั่งเข็ม (Embed)",
                 topBar: "เสริมเหล็กบน (Top)", expand: "ขยายฐานอัตโนมัติ",
-                deepOption: "พิจารณาผลของคานลึก (Deep Beam)", // ✅ เพิ่ม
+                deepOption: "พิจารณาผลของคานลึก (Deep Beam)", 
             },
             report: {
-                // ... (คงเดิม)
                 step1: "1. ข้อมูลการออกแบบ (Design Parameters)",
                 step2: "2. ตรวจสอบน้ำหนักลงเสาเข็ม (Pile Reactions)",
                 step3: "3. ออกแบบโครงสร้าง (แกน X)",
@@ -327,7 +342,7 @@ export const UI_TEXT = {
                 fc: "กำลังคอนกรีต (fc')", fy: "กำลังเหล็ก (fy)",
                 case: "รูปแบบจุดรองรับ", bar: "เหล็กเสริม", spa: "ระยะเรียง",
                 expand: "ขยายฐานอัตโนมัติ",
-                cantilever: "พื้นยื่น (Cantilever)" // ✅ NEW
+                cantilever: "พื้นยื่น (Cantilever)"
             },
             report: {
                 step1: "1. ข้อมูลการออกแบบ (Design Parameters)",
@@ -341,7 +356,7 @@ export const UI_TEXT = {
         }
     }
 }; 
- 
+
 // ==========================================
 // 4. SLAB DATA (Phase 1: Precision)
 // ==========================================
@@ -356,16 +371,5 @@ export const SLAB_DATA = {
         { id: 7, name_th: "7. ต่อเนื่องด้านสั้น 2 + ยาว 1", name_en: "7. Two Short + One Long Cont." },
         { id: 8, name_th: "8. ต่อเนื่องด้านสั้น 1 ด้าน", name_en: "8. One Short Edge Continuous" },
         { id: 9, name_th: "9. ต่อเนื่องด้านยาว 1 ด้าน", name_en: "9. One Long Edge Continuous" }
-    ],
-    COEFFICIENTS: {
-        1: { ca_neg: 0, cb_neg: 0, ca_dl: 0.036, cb_dl: 0.036, ca_ll: 0.036, cb_ll: 0.036 },
-        2: { ca_neg: 0.050, cb_neg: 0.050, ca_dl: 0.018, cb_dl: 0.018, ca_ll: 0.027, cb_ll: 0.027 },
-        3: { ca_neg: 0.050, cb_neg: 0, ca_dl: 0.027, cb_dl: 0.027, ca_ll: 0.032, cb_ll: 0.032 },
-        4: { ca_neg: 0, cb_neg: 0.050, ca_dl: 0.027, cb_dl: 0.027, ca_ll: 0.032, cb_ll: 0.032 },
-        5: { ca_neg: 0.050, cb_neg: 0.050, ca_dl: 0.022, cb_dl: 0.022, ca_ll: 0.029, cb_ll: 0.029 },
-        6: { ca_neg: 0.050, cb_neg: 0.050, ca_dl: 0.020, cb_dl: 0.020, ca_ll: 0.028, cb_ll: 0.028 },
-        7: { ca_neg: 0.050, cb_neg: 0.050, ca_dl: 0.020, cb_dl: 0.020, ca_ll: 0.028, cb_ll: 0.028 },
-        8: { ca_neg: 0.060, cb_neg: 0, ca_dl: 0.030, cb_dl: 0.030, ca_ll: 0.035, cb_ll: 0.035 },
-        9: { ca_neg: 0, cb_neg: 0.060, ca_dl: 0.030, cb_dl: 0.030, ca_ll: 0.035, cb_ll: 0.035 }
-    }
+    ]
 };

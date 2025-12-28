@@ -1,8 +1,8 @@
-import { CONSTANTS } from '../constants';
 import { checkStairStandard, DesignStandard, getLoadFactors, CodeCheckResult } from './stairStandards';
+import { CONSTANTS } from '../constants';
 
 export interface StairInput {
-    structType: 'Slab' | 'Zigzag' | 'Spiral';      
+    structType: 'Slab' | 'Zigzag' | 'Spiral';       
     supportType: 'Longitudinal' | 'Cantilever'; 
     layoutType: 'Straight' | 'DogLegged';
     landingSupport: 'Supported' | 'Free'; 
@@ -22,12 +22,14 @@ export interface StairResult {
     calcHeight: number; numSteps: number; actualRiser: number; totalRun: number; totalSpan: number; slopeDeg: number;
     headroom: number; headroomStatus: 'PASS' | 'FAIL';
     w_dead_slope: number; w_live: number; w_total: number; 
-    loadFactorText: string; // ✅ Display Factor Info
+    loadFactorText: string; 
     beamLoad_Unfactored: number; beamLoad_Factored: number; beamTorsion_Factored: number;
     reaction_R1: number; reaction_R2: number;
     Mu_max: number; d: number; As_req: number; As_prov: number; As_temp: number;
     delta_immediate: number; delta_longterm: number; delta_allow: number; deflectionStatus: 'PASS' | 'FAIL';
     naturalFreq: number; vibrationStatus: 'COMFORT' | 'BOUNCY';
+    // ✅ เพิ่ม crackStatus ตรงนี้ครับ
+    crackStatus: 'PASS' | 'FAIL';
     status: 'PASS' | 'FAIL'; warnings: string[];
     volConcrete: number; weightSteel: number; areaForm: number;
     codeCheck: CodeCheckResult;
@@ -75,12 +77,12 @@ export const calculateStair = (input: StairInput): StairResult => {
     if (codeCheck.status === 'FAIL') warnings.push(...codeCheck.messages);
     const headroomStatus = codeCheck.status === 'FAIL' && headroom < 2.0 ? 'FAIL' : 'PASS';
 
-    // 3. Loads (Dynamic Factors) ✅
-    const factors = getLoadFactors(standard); // Get DL/LL factors
-    let w_self = structType === 'Slab' ? (verticalWaist * 2400) + ((actualRiser/100/2)*2400) : (verticalWaist * 2400); 
+    // 3. Loads (Dynamic Factors)
+    const factors = getLoadFactors(standard); 
+    let w_self = structType === 'Slab' ? (verticalWaist * CONSTANTS.MATERIAL_WEIGHTS.CONCRETE) + ((actualRiser/100/2)*CONSTANTS.MATERIAL_WEIGHTS.CONCRETE) : (verticalWaist * CONSTANTS.MATERIAL_WEIGHTS.CONCRETE); 
     const w_dead = w_self + sdl; 
     const w_service = w_dead + ll; 
-    const w_factored = (factors.DL * w_dead) + (factors.LL * ll); // ✅ Dynamic Formula
+    const w_factored = (factors.DL * w_dead) + (factors.LL * ll); 
     const w_design = w_factored * 1.0; 
 
     // 4. Analysis
@@ -126,15 +128,18 @@ export const calculateStair = (input: StairInput): StairResult => {
     const As_temp = 0.0018 * 100 * waist;
     const As_prov = (100 / spacing) * (Math.PI * Math.pow(mainBarDia/10, 2)) / 4;
     
-    // Deflection
-    const Ec = 15100 * Math.sqrt(fc); const Es = 2040000; const n = Es / Ec;
+    // Deflection (Branson)
+    const Ec = CONSTANTS.STEEL.Ec_formula(fc); 
+    const Es = CONSTANTS.STEEL.Es_ksc; 
+    const n = Es / Ec;
     const Ig = (100 * Math.pow(waist, 3)) / 12;
     const nAs = n * As_prov;
     const kd = (Math.sqrt(Math.pow(nAs, 2) + 2*100*nAs*d) - nAs) / 100;
     const Icr = (100 * Math.pow(kd, 3) / 3) + (nAs * Math.pow(d - kd, 2));
     const fr = 2.0 * Math.sqrt(fc);
     const Ma = (supportType==='Cantilever' ? w_service * Math.pow(totalSpan,2)/2 : w_service * Math.pow(totalSpan,2)/8) * 100;
-    const ratio = (fr * Ig / (waist/2)) < Ma ? Math.pow((fr * Ig / (waist/2))/Ma, 3) : 1;
+    const Mcr = (fr * Ig) / (waist/2);
+    const ratio = Mcr < Ma ? Math.pow(Mcr/Ma, 3) : 1;
     const Ie = Math.min(Ig, ratio * Ig + (1 - ratio) * Icr);
 
     const L_cm = totalSpan * 100;
@@ -152,18 +157,20 @@ export const calculateStair = (input: StairInput): StairResult => {
 
     // 6. BOQ
     const vol = (totalSpan * width * waist/100) + (numSteps * actualRiser/100 * actualGoing/100 / 2 * width);
-    const weightSteel = vol * 120;
+    const weightSteel = vol * CONSTANTS.ESTIMATION.REBAR_KG_PER_M3_STAIR;
     const areaForm = totalSpan * width * 2; 
 
     return {
         calcHeight, numSteps, actualRiser, totalRun: flightRun, totalSpan, slopeDeg: angleDeg,
         headroom, headroomStatus,
         w_dead_slope: w_dead, w_live: ll, w_total: w_factored,
-        loadFactorText: `${factors.DL}DL + ${factors.LL}LL`, // ✅
+        loadFactorText: `${factors.DL}DL + ${factors.LL}LL`,
         beamLoad_Unfactored: beamLoad_Unf, beamLoad_Factored: beamLoad_Fac, beamTorsion_Factored: beamTorsion,
         reaction_R1: R1, reaction_R2: R2,
         Mu_max: Mu, d, As_req, As_prov, As_temp,
-        delta_immediate: delta_imm, delta_longterm: delta_long, delta_allow, deflectionStatus, crackStatus: 'PASS',
+        delta_immediate: delta_imm, delta_longterm: delta_long, delta_allow, deflectionStatus,
+        // ✅ เพิ่ม crackStatus ใน object return
+        crackStatus: 'PASS', 
         naturalFreq: fn, vibrationStatus,
         status: (As_prov >= As_req && deflectionStatus === 'PASS' && headroomStatus === 'PASS' && codeCheck.status === 'PASS') ? 'PASS' : 'FAIL',
         warnings, volConcrete: vol, weightSteel, areaForm, codeCheck

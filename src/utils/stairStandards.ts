@@ -5,14 +5,14 @@ export interface CodeCheckResult {
     messages: string[];
 }
 
-// ✅ New: Helper to get Load Factors dynamically
+// Helper to get Load Factors dynamically
 export const getLoadFactors = (std: DesignStandard) => {
     switch (std) {
         case 'Thai_MR55':
-            return { DL: 1.4, LL: 1.7, note: 'EIT/ACI (Classic)' };
+            return { DL: 1.4, LL: 1.7, note: 'EIT (Classic)' };
         case 'NFPA_101':
         case 'IBC_2021':
-            return { DL: 1.2, LL: 1.6, note: 'ASCE 7 / ACI 318 (Modern)' };
+            return { DL: 1.2, LL: 1.6, note: 'ACI 318-19 / ASCE 7' };
         default:
             return { DL: 1.4, LL: 1.7, note: 'Default' };
     }
@@ -28,7 +28,7 @@ export const checkStairStandard = (
     const msgs: string[] = [];
     let isPass = true;
 
-    // 1. กฎกระทรวงฉบับที่ 55 (ไทย)
+    // 1. Thai MR.55
     if (std === 'Thai_MR55') {
         if (riser > 20.0) { msgs.push(`ลูกตั้ง ${riser} cm เกินกำหนด (Max 20 cm)`); isPass = false; }
         if (going < 22.0) { msgs.push(`ลูกนอน ${going} cm น้อยกว่ากำหนด (Min 22 cm)`); isPass = false; }
@@ -36,14 +36,14 @@ export const checkStairStandard = (
         if (headroom < 1.90) { msgs.push(`ระยะดิ่ง ${headroom.toFixed(2)} m น้อยกว่ากำหนด (Min 1.90 m)`); isPass = false; }
     }
     
-    // 2. NFPA 101 (Life Safety Code)
+    // 2. NFPA 101
     else if (std === 'NFPA_101') {
         if (riser > 17.8) { msgs.push(`Riser ${riser} cm exceeds NFPA Max (17.8 cm / 7")`); isPass = false; }
         if (going < 28.0) { msgs.push(`Tread ${going} cm is less than NFPA Min (28 cm / 11")`); isPass = false; }
         if (headroom < 2.03) { msgs.push(`Headroom ${headroom.toFixed(2)} m is less than NFPA Min (2.03 m / 80")`); isPass = false; }
     }
 
-    // 3. IBC 2021 (International Building Code)
+    // 3. IBC 2021
     else if (std === 'IBC_2021') {
         if (riser > 17.8) { msgs.push(`Riser ${riser} cm exceeds IBC Max (17.8 cm / 7")`); isPass = false; }
         if (going < 28.0) { msgs.push(`Tread ${going} cm is less than IBC Min (28 cm / 11")`); isPass = false; }

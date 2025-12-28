@@ -31,10 +31,9 @@ const getPhiFlexure = (epsilon_t: number, standard: Standard) => {
     if (epsilon_t >= 0.005) return PHI.FLEXURE_MAX;
     
     // Compression Controlled (Strain <= 0.002)
-    if (epsilon_t <= 0.002) return PHI.FLEXURE_MIN; // 0.65 for tied (Beams are usually tied)
+    if (epsilon_t <= 0.002) return PHI.FLEXURE_MIN; 
     
     // Transition Zone (Linear Interpolation)
-    // phi = 0.65 + (epsilon_t - 0.002) * (250/3)
     return PHI.FLEXURE_MIN + (epsilon_t - 0.002) * (250/3) * (PHI.FLEXURE_MAX - PHI.FLEXURE_MIN);
 };
 
@@ -46,6 +45,7 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
     const { fc, bw, h, covering, Mu_pos, Mu_neg, Vu, Tu } = inputs;
     
     if (bw <= 0 || h <= 0 || fc <= 0 || covering < 0) {
+        // Return Empty Result if inputs are invalid
         return {
             phi_bending: 0.9, phi_shear: 0.75, phi_torsion: 0.75, fy_main: 0, fy_stirrup: 0, beta1: 0.85,
             bot: { a: 0, d_design: 0, epsilon_t: 0, As_calc: 0, As_min: 0, As_req: 0, Mu_capacity:0, ratio:0, isTensionControlled: true, layers: { numBars: 0, numLayers: 1, barsPerLayer: [], d_centroid: 0, isCongested: false } },
@@ -93,7 +93,7 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
         let As_req_final = 0;
         let layersInfo: LayerResult = { numBars: 0, numLayers: 1, barsPerLayer: [], d_centroid: d_design, isCongested: false };
         let calculationVars = { a: 0, epsilon_t: 0, isTensionControlled: true, As_calc: 0, As_min: 0 };
-        let phi_flex_final = PHI.FLEXURE_MAX; // Default 0.9
+        let phi_flex_final = PHI.FLEXURE_MAX;
 
         const MAX_ITER = 10;
         
@@ -109,8 +109,6 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
 
             if (Mu <= 0) { As_req_final = 0; break; }
 
-            // Initial guess using phi = 0.9 or previous iteration's phi
-            // NOTE: We start optimistic with 0.9 to find As, then check strain
             let phi_iter = PHI.FLEXURE_MAX; 
             
             const term_moment = (2 * Mu * 100) / (0.85 * fc * phi_iter * bw);
@@ -126,15 +124,12 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
                 const c = a / beta1;
                 epsilon_t = ((d_design - c) / c) * epsilon_cu;
                 
-                // ✅ Recalculate Phi based on actual strain
                 phi_iter = getPhiFlexure(epsilon_t, standard);
                 
                 if (epsilon_t < epsilon_t_limit) {
                     isTensionControlled = false;
-                    // Recalculate As with new Phi if needed (simplified here for display)
                 }
                 
-                // Final As calc with correct Phi
                 As_calc = (Mu * 100) / (phi_iter * fy_main * (d_design - a/2));
             }
 
@@ -148,7 +143,6 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
             As_req_final = As_final;
             phi_flex_final = phi_iter;
 
-            // Recalculate d
             const barArea = (Math.PI * Math.pow(db / 2, 2));
             let numBars = Math.max(2, Math.ceil(As_final / barArea));
             if (isManual && provBars > 0) numBars = provBars;
@@ -181,7 +175,6 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
         const a_real = (As_prov * fy_main) / (0.85 * fc * bw);
         const Mn_kgm = (As_prov * fy_main * (d_design - a_real/2)) / 100;
         
-        // ✅ Use Dynamic Phi for Capacity
         const Mu_capacity = phi_flex_final * Mn_kgm;
         const ratio = Mu > 0 ? Mu / Mu_capacity : 0;
 
@@ -206,7 +199,6 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
         const bw_mm = bw * 10;
         const d_shear_mm = d_shear * 10;
         
-        // ✅ Note about lightweight concrete
         const lambda = CONSTANTS.CONCRETE.LAMBDA_LIGHTWEIGHT; // 1.0
         const Vc_N = (0.66 * lambda * lambda_s * Math.pow(Math.min(rho_w, 0.025), 1/3) * Math.sqrt(fc_MPa)) * bw_mm * d_shear_mm;
         Vc = Math.max(Vc_N * CONSTANTS.CONV_N_TO_KG, 0.53 * Math.sqrt(fc) * bw * d_shear);
@@ -328,7 +320,7 @@ export const calculateBeamDesign = (inputs: BeamInput, standard: Standard, lang:
     ];
 
     return {
-        phi_bending: PHI.FLEXURE_MAX, // Show Base
+        phi_bending: PHI.FLEXURE_MAX,
         phi_shear, phi_torsion, fy_main, fy_stirrup, beta1,
         bot, top, Vc, phiVc, Vu_limit, Vs_req, Av_s_shear_req, Av_s_min, shearStatus,
         Tth, isTorsionRequired, Al_req, At_s_req, Total_Av_s_req, Total_As_bot_req, Total_As_top_req,

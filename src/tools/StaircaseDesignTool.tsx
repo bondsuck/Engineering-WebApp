@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     ChevronLeft, Calculator, Printer, FileText, Settings, 
-    Layers, Box, Grid, ArrowUpRight, AlertTriangle, 
-    GitFork, Anchor, Activity, ArrowRightLeft, FastForward, Download, Scale
+    Layers, Box, Grid, AlertTriangle, 
+    GitFork, Anchor, Activity, ArrowRightLeft, FastForward, Download, Scale,
+    ArrowUpRight // ✅ เพิ่ม Import ตรงนี้
 } from 'lucide-react';
 import { StairInput, calculateStair } from '../utils/rcStairCalculation';
 import { generateStairDxf } from '../utils/stairDxfLogic';
@@ -148,9 +149,8 @@ const StaircaseDesignTool = ({ onBack, isPro = false }: Props) => {
                                 </div>
                                 <div className="space-y-4">
                                     <div className="bg-[#151F32] border border-slate-800 rounded-xl p-4">
-                                        <h4 className="font-bold text-sm text-blue-400 mb-2 border-b border-slate-700 pb-1">1. Structural Capacity</h4>
+                                        <h4 className="font-bold text-sm text-blue-400 mb-2 border-b border-slate-700 pb-1">1. Structural Capacity ({res.loadFactorText})</h4>
                                         <div className="grid grid-cols-2 gap-2 text-sm text-slate-300">
-                                            <span>Load Factors:</span><span className="text-right text-gray-400">{res.loadFactorText}</span>
                                             <span>Moment (Mu):</span><span className="text-right font-mono">{res.Mu_max.toFixed(2)} kg-m</span>
                                             <span>Check:</span><span className="text-right font-bold">{PASS_FAIL(res.status)}</span>
                                         </div>
@@ -179,34 +179,46 @@ const StaircaseDesignTool = ({ onBack, isPro = false }: Props) => {
                     )}
 
                     {activeTab === 1 && (
-                        <div className="bg-white text-black p-10 shadow-xl mx-auto min-h-[1123px] w-[794px] text-sm relative print:w-full print:h-auto print:shadow-none print:p-0">
-                            <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-8">
-                                <div><h1 className="text-3xl font-bold uppercase">Calculation Sheet</h1><p>RC Staircase Design</p></div>
-                                <div className="text-right text-xs text-slate-500"><div>{new Date().toLocaleDateString()}</div><div>{inputs.standard}</div></div>
+                        <div className="bg-white text-black p-10 shadow-xl mx-auto min-h-[1000px] w-full max-w-[210mm] text-sm">
+                            <div className="flex justify-end mb-6 print:hidden gap-2">
+                                <button onClick={handleExportDXF} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-bold"><Download size={18}/> Export DXF</button>
+                                <button onClick={()=>window.print()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold"><Printer size={18}/> Print Report</button>
                             </div>
-                            <div className="grid grid-cols-2 gap-10">
-                                <div className="space-y-6">
-                                    <section><h3 className="font-bold text-lg text-blue-800 border-b mb-2">1. Parameters</h3><div className="grid grid-cols-2 gap-y-1 text-sm"><span className="text-slate-600">Type:</span><span>{inputs.structType}</span><span className="text-slate-600">Step:</span><span>{inputs.riser}x{inputs.going} cm</span></div></section>
-                                    <section><h3 className="font-bold text-lg text-blue-800 border-b mb-2">2. Loads ({res.loadFactorText})</h3><div className="grid grid-cols-2 gap-y-1 text-sm"><span className="text-slate-600">Factored Load:</span><span className="font-bold">{res.w_total.toFixed(0)} kg/m²</span></div></section>
+                            <div className="border-b-2 border-black pb-4 mb-6">
+                                <h1 className="text-2xl font-bold uppercase tracking-wider">RC Staircase Calculation</h1>
+                                <p className="text-sm text-gray-600">Type: {inputs.structType} | Standard: {inputs.standard}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-8 mb-6">
+                                <div>
+                                    <h3 className="font-bold text-blue-800 mb-2 border-b">1. Geometry</h3>
+                                    <div className="text-xs space-y-1">
+                                        <div>Floor Height: {inputs.floorHeight.toFixed(2)} m (Calc Height: {res.calcHeight.toFixed(2)} m)</div>
+                                        <div>Width: {inputs.width.toFixed(2)} m</div>
+                                        <div>Step: {inputs.riser}x{inputs.going} cm ({res.numSteps} steps)</div>
+                                        <div>Waist: {inputs.waist} cm, Slope: {res.slopeDeg.toFixed(1)}°</div>
+                                    </div>
                                 </div>
-                                <div><div className="border p-4 mb-6 flex justify-center bg-slate-50"><div className="scale-75 origin-top"><StairView {...inputs} numSteps={res.numSteps} /></div></div></div>
+                                <div><div className="border p-2 flex justify-center"><div className="scale-75 origin-top"><StairView {...inputs} numSteps={res.numSteps} /></div></div></div>
                             </div>
-                            <section className="mt-8">
-                                <h3 className="font-bold text-lg text-blue-800 border-b mb-4">3. Results</h3>
-                                <table className="w-full text-sm text-left border-collapse"><thead><tr className="bg-slate-100 border-b"><th className="p-2">Item</th><th className="p-2">Value</th><th className="p-2">Result</th></tr></thead><tbody>
-                                    <tr><td className="p-2">Moment (Mu)</td><td className="p-2">{res.Mu_max.toFixed(2)} kg-m</td><td className="p-2 font-bold">{res.status}</td></tr>
-                                    <tr><td className="p-2">Deflection</td><td className="p-2">{res.delta_longterm.toFixed(2)} cm</td><td className="p-2 font-bold">{res.deflectionStatus}</td></tr>
-                                    <tr><td className="p-2">Code Check</td><td className="p-2">{res.codeCheck.messages.length} Issues</td><td className="p-2 font-bold">{res.codeCheck.status}</td></tr>
-                                </tbody></table>
-                            </section>
-                            <div className="absolute bottom-10 left-10 right-10 flex justify-between mt-20 pt-10 border-t border-slate-300">
-                                <div className="text-center w-1/3"><div className="h-10 border-b border-dotted border-slate-400 mb-2"></div><p className="text-xs font-bold">Designed By</p></div>
-                                <div className="text-center w-1/3"><div className="h-10 border-b border-dotted border-slate-400 mb-2"></div><p className="text-xs font-bold">Approved By</p></div>
-                            </div>
-                            <div className="absolute top-10 right-10 flex gap-2 print:hidden">
-                                <button onClick={handleExportDXF} className="bg-green-600 text-white px-3 py-1 rounded text-xs flex gap-1"><Download size={12}/> DXF</button>
-                                <button onClick={()=>window.print()} className="bg-blue-600 text-white px-3 py-1 rounded text-xs flex gap-1"><Printer size={12}/> Print</button>
-                            </div>
+                            <h3 className="font-bold text-blue-800 mb-2 border-b">2. Structural Design</h3>
+                            <table className="w-full text-xs text-left mb-6">
+                                <thead className="bg-gray-100"><tr><th className="p-1">Parameter</th><th className="p-1">Value</th><th className="p-1">Note</th></tr></thead>
+                                <tbody className="divide-y">
+                                    <tr><td className="p-1">Design Load (wu)</td><td className="p-1">{res.w_total.toFixed(0)} kg/m²</td><td className="p-1">{res.loadFactorText}</td></tr>
+                                    <tr><td className="p-1">Design Moment (Mu)</td><td className="p-1">{res.Mu_max.toFixed(2)} kg-m</td><td className="p-1">{inputs.supportType==='Cantilever'?'wL²/2':'wL²/8'}</td></tr>
+                                    <tr><td className="p-1">Rebar Required</td><td className="p-1">{res.As_req.toFixed(2)} cm²/m</td><td className="p-1">{res.status}</td></tr>
+                                    <tr><td className="p-1">Provided</td><td className="p-1">DB{inputs.mainBarDia}@{inputs.spacing}cm</td><td className="p-1">{res.As_prov.toFixed(2)} cm²</td></tr>
+                                </tbody>
+                            </table>
+                            <h3 className="font-bold text-blue-800 mb-2 border-b">3. Serviceability Checks</h3>
+                            <table className="w-full text-xs text-left mb-6">
+                                <thead className="bg-gray-100"><tr><th className="p-1">Check</th><th className="p-1">Actual</th><th className="p-1">Limit</th><th className="p-1">Status</th></tr></thead>
+                                <tbody className="divide-y">
+                                    <tr><td className="p-1">Deflection (Long Term)</td><td className="p-1">{res.delta_longterm.toFixed(3)} cm</td><td className="p-1">{res.delta_allow.toFixed(3)} cm (L/480)</td><td className="p-1 font-bold">{PASS_FAIL(res.deflectionStatus)}</td></tr>
+                                    <tr><td className="p-1">Crack Control (Spacing)</td><td className="p-1">{inputs.spacing} cm</td><td className="p-1">Max 30 cm</td><td className="p-1 font-bold">{PASS_FAIL(res.crackStatus)}</td></tr>
+                                    <tr><td className="p-1">Code Check</td><td className="p-1">{res.codeCheck.messages.length} Issues</td><td className="p-1">{inputs.standard}</td><td className="p-1 font-bold">{res.codeCheck.status}</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     )}
 
@@ -216,7 +228,7 @@ const StaircaseDesignTool = ({ onBack, isPro = false }: Props) => {
                             <table className="w-full text-sm text-left text-slate-300"><thead className="bg-slate-900 text-white text-base"><tr><th className="p-3">Item</th><th className="p-3 text-right">Qty</th><th className="p-3 text-right">Unit</th><th className="p-3 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-800 text-sm">
                                 <tr><td className="p-3">Concrete</td><td className="p-3 text-right">{res.volConcrete.toFixed(2)}</td><td className="p-3 text-right">{MATERIAL_COSTS.CONCRETE_M3}</td><td className="p-3 text-right">{(res.volConcrete*MATERIAL_COSTS.CONCRETE_M3).toLocaleString()}</td></tr>
                                 <tr><td className="p-3">Rebar</td><td className="p-3 text-right">{res.weightSteel.toFixed(1)}</td><td className="p-3 text-right">{MATERIAL_COSTS.REBAR_KG}</td><td className="p-3 text-right">{(res.weightSteel*MATERIAL_COSTS.REBAR_KG).toLocaleString()}</td></tr>
-                                <tr className="bg-slate-800 font-bold text-white"><td className="p-3" colSpan={3}>Grand Total</td><td className="p-3 text-right">{((res.volConcrete*MATERIAL_COSTS.CONCRETE_M3) + (res.weightSteel*MATERIAL_COSTS.REBAR_KG) + (res.areaForm*MATERIAL_COSTS.FORMWORK_M2)).toLocaleString()}</td></tr>
+                                <tr className="bg-slate-800 font-bold text-white"><td className="p-3" colSpan={3}>Grand Total</td><td className="p-3 text-right">{((res.volConcrete*MATERIAL_COSTS.CONCRETE_M3) + (res.weightSteel*MATERIAL_COSTS.REBAR_KG) + (res.areaForm*MATERIAL_COSTS.FORMWORK_M2)).toLocaleString()} THB</td></tr>
                             </tbody></table>
                         </div>
                     )}

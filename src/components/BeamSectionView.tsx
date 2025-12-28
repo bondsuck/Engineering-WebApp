@@ -1,3 +1,5 @@
+import { THEME } from '../constants';
+
 interface BeamSectionViewProps {
     b: number; h: number; cover: number;
     topBarDia: number; topBarType: string;
@@ -6,7 +8,7 @@ interface BeamSectionViewProps {
     numBarsBot: number; numBarsTop: number;
     stirrupSpacing: number;
     barsPerLayerBot: number[]; barsPerLayerTop: number[];
-    isReport?: boolean; // 🛠️ 1. เพิ่ม Prop เช็คว่าเป็น Report หรือไม่
+    isReport?: boolean;
 }
 
 export const BeamSectionView = ({
@@ -16,7 +18,7 @@ export const BeamSectionView = ({
     stirrupDia, stirrupType, 
     numBarsBot, numBarsTop, stirrupSpacing,
     barsPerLayerBot, barsPerLayerTop,
-    isReport = false // Default คือ false (Dark mode)
+    isReport = false
 }: BeamSectionViewProps) => {
 
     const canvasW = 500;
@@ -38,25 +40,25 @@ export const BeamSectionView = ({
     const botBarDiaPx = (botBarDia / 10) * scale;
     const layerSpacingPx = 2.5 * scale; 
 
-    // 🛠️ 2. กำหนดชุดสีตามโหมด (Dark UI vs Print Report)
+    // ✅ ใช้ THEME.COLORS
     const theme = isReport ? {
-        concreteFill: "#ffffff",      // ขาว
-        concreteStroke: "#000000",    // ดำ
-        stirrup: "#ef4444",           // แดงเข้ม
-        barTop: "#dc2626",            // แดง
-        barBot: "#16a34a",            // เขียว
-        text: "#000000",              // ดำ
-        line: "#64748b",              // เทาเข้ม
-        callout: "#000000"            // ดำ
+        concreteFill: "#ffffff",
+        concreteStroke: "#000000",
+        stirrup: "#000000",
+        barTop: "#000000",
+        barBot: "#000000",
+        text: "#000000",
+        line: "#64748b",
+        callout: "#000000"
     } : {
-        concreteFill: "#1e293b",      // Slate-800
-        concreteStroke: "#475569",    // Slate-600
-        stirrup: "#fca5a5",           // Rose-300
-        barTop: "#ef4444",            // Red-500
-        barBot: "#22c55e",            // Green-500
-        text: "#94a3b8",              // Slate-400
-        line: "#64748b",              // Slate-500
-        callout: "#ffffff"            // White
+        concreteFill: "#1e293b",
+        concreteStroke: "#475569",
+        stirrup: THEME.COLORS.REBAR_STIRRUP,
+        barTop: THEME.COLORS.REBAR_MAIN,
+        barBot: THEME.COLORS.REBAR_MAIN, // Or differentiate if needed
+        text: "#94a3b8",
+        line: "#64748b",
+        callout: "#ffffff"
     };
 
     const renderBars = (isTop: boolean, layers: number[], diaPx: number) => {

@@ -27,7 +27,10 @@ const IsolatedFootingTool = ({ onBack, isPro = false }: Props) => {
         mainBarDia: 16, spacingX: 20, spacingY: 20
     });
 
-    const updateInput = (key: keyof FootingInput, val: any) => setInputs(p => ({ ...p, [key]: val }));
+    const updateInput = <K extends keyof FootingInput>(key: K, val: FootingInput[K]) => {
+        setInputs(p => ({ ...p, [key]: val }));
+    };
+    
     const res = useMemo(() => calculateFooting(inputs), [inputs]);
 
     const handleAutoDesign = () => {
@@ -112,7 +115,7 @@ const IsolatedFootingTool = ({ onBack, isPro = false }: Props) => {
 
                 {/* RIGHT: OUTPUTS */}
                 <div className="lg:col-span-8 space-y-4 print:col-span-12">
-                     <div className="flex gap-2 border-b border-slate-700 pb-2 print:hidden">
+                      <div className="flex gap-2 border-b border-slate-700 pb-2 print:hidden">
                         <button onClick={() => setActiveTab(0)} className={TAB_BTN_CLS(activeTab===0)}><Calculator size={16}/> Analysis</button>
                         <button onClick={() => setActiveTab(1)} className={TAB_BTN_CLS(activeTab===1)}><FileText size={16}/> Report</button>
                         <button onClick={() => setActiveTab(2)} className={TAB_BTN_CLS(activeTab===2)}><Settings size={16}/> BOQ</button>

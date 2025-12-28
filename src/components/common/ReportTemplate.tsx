@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { Printer } from 'lucide-react';
 import { TYPO } from '../../constants';
 
@@ -5,13 +6,12 @@ interface ReportTemplateProps {
     title: string;
     subtitle?: string;
     onPrint?: () => void;
-    children: React.ReactNode;
+    children: ReactNode;
 }
 
 export const ReportTemplate = ({ title, subtitle, onPrint, children }: ReportTemplateProps) => {
     return (
         <div className="bg-slate-500 min-h-screen p-4 flex justify-center items-start print:bg-white print:p-0 print:block">
-            
             {/* A4 Paper Container */}
             <div className="bg-white text-black shadow-2xl mx-auto w-[210mm] min-h-[297mm] p-[15mm] relative print:shadow-none print:w-full print:h-auto print:p-0 print:m-0 print:mx-0">
                 

@@ -1,14 +1,15 @@
-import { CONSTANTS, MATERIAL_COSTS, UI_TEXT, SLAB_DATA } from '../constants';
-import { Standard, Language } from '../types';
+import { CONSTANTS, SLAB_DATA, UI_TEXT, MATERIAL_COSTS } from '../constants';
+import { Standard, Language, SteelGrade } from '../types';
 
+// ✅ Interfaces (Single Source of Truth)
 export interface SlabInput {
     lx: number; ly: number; thickness: number; covering: number;
     sdl: number; ll: number;
     fc: number; fy: number;
-    steelType: string;
+    steelType: SteelGrade; // ✅ Strict Type
     mainBarDia: number;
     standard: Standard;
-    isCantilever: boolean; // ✅ NEW Input
+    isCantilever: boolean;
     edges: { top: boolean; right: boolean; bottom: boolean; left: boolean }; 
 }
 
@@ -17,7 +18,6 @@ export interface SlabResult {
     caseType: number; m_ratio: number;
     w_total: number; factors: { DL: number, LL: number };
     
-    // Checks
     h_min: number; h_status: 'PASS' | 'FAIL';
     
     momentX: { neg_cont: number; pos_dead: number; pos_live: number; neg_discont: number; design: number };
@@ -37,6 +37,7 @@ export interface SlabResult {
     reportSteps: { title: string, content: string[] }[];
 }
 
+// Helpers
 const fmt = (n: number, d: number = 2) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 const eq = (name: string, val: string, unit: string = "") => `<div style="display:flex; justify-content:space-between; align-items:center;"><span>${name}</span> <span style="white-space:nowrap; margin-left:8px;">= <b>${val}</b> ${unit}</span></div>`;
 const sub = (text: string) => `<span style="color:#64748b; display:block; margin-left:8px; opacity:0.8; font-size: 0.9em;">↳ ${text}</span>`;
@@ -55,7 +56,6 @@ const determineCase = (nShortCont: number, nLongCont: number): number => {
     return 1; 
 };
 
-// ... (getCoefficients code remains the same, included below for completeness) ...
 const getCoefficients = (caseNum: number, m: number) => {
     const lerp = (x: number, x0: number, y0: number, x1: number, y1: number) => y0 + (x - x0) * (y1 - y0) / (x1 - x0);
     
@@ -67,18 +67,18 @@ const getCoefficients = (caseNum: number, m: number) => {
     else if(caseNum===3) { ca_neg_05=0; ca_neg_10=0; cb_neg_05=0.007; cb_neg_10=0.033; ca_dl_05=0.090; ca_dl_10=0.033; cb_dl_05=0.005; cb_dl_10=0.013; }
     else if(caseNum===4) { ca_neg_05=0.084; ca_neg_10=0.033; cb_neg_05=0; cb_neg_10=0; ca_dl_05=0.039; ca_dl_10=0.016; cb_dl_05=0.003; cb_dl_10=0.027; }
     else {
-        // Fallback approx
         ca_neg_05=0.070; ca_neg_10=0.033; cb_neg_05=0.010; cb_neg_10=0.033;
         ca_dl_05=0.045; ca_dl_10=0.020; cb_dl_05=0.005; cb_dl_10=0.020;
     }
 
-    const ca_neg = lerp(m, 0.5, ca_neg_05, 1.0, ca_neg_10);
-    const cb_neg = lerp(m, 0.5, cb_neg_05, 1.0, cb_neg_10);
-    const ca_dl = lerp(m, 0.5, ca_dl_05, 1.0, ca_dl_10);
-    const cb_dl = lerp(m, 0.5, cb_dl_05, 1.0, cb_dl_10);
-    const ca_ll = ca_dl; const cb_ll = cb_dl;
-
-    return { ca_neg, cb_neg, ca_dl, cb_dl, ca_ll, cb_ll };
+    return { 
+        ca_neg: lerp(m, 0.5, ca_neg_05, 1.0, ca_neg_10),
+        cb_neg: lerp(m, 0.5, cb_neg_05, 1.0, cb_neg_10),
+        ca_dl: lerp(m, 0.5, ca_dl_05, 1.0, ca_dl_10),
+        cb_dl: lerp(m, 0.5, cb_dl_05, 1.0, cb_dl_10),
+        ca_ll: lerp(m, 0.5, ca_dl_05, 1.0, ca_dl_10), // Approx same
+        cb_ll: lerp(m, 0.5, cb_dl_05, 1.0, cb_dl_10)
+    };
 };
 
 export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResult => {
@@ -89,7 +89,6 @@ export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResu
     const PHI = standard === 'ACI318-19' ? CONSTANTS.PHI.ACI318_19 : CONSTANTS.PHI.EIT;
 
     let S = lx, L = ly;
-    // ... (Standardization Logic same as before) ...
     let nShortCont = 0, nLongCont = 0;
     let nCont_Lx = (edges.top ? 1 : 0) + (edges.bottom ? 1 : 0);
     let nCont_Ly = (edges.left ? 1 : 0) + (edges.right ? 1 : 0);
@@ -101,15 +100,13 @@ export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResu
     const isOneWay = m < 0.5;
     const caseNum = determineCase(nShortCont, nLongCont);
 
-    const w_slab = (thickness / 100) * 2400; 
+    const w_slab = (thickness / 100) * CONSTANTS.MATERIAL_WEIGHTS.CONCRETE; 
     const w_dead = w_slab + sdl;
     const w_total = LF.DL * w_dead + LF.LL * ll;
 
     let h_min = 0;
-    // ✅ Logic: Deflection Check
-    if (isCantilever) {
-        h_min = (S * 100) / 10; // Cantilever L/10
-    } else if (isOneWay) {
+    if (isCantilever) h_min = (S * 100) / 10;
+    else if (isOneWay) {
         const contCount = (lx<=ly ? nCont_Ly : nCont_Lx); 
         const factor = contCount === 0 ? 20 : (contCount === 1 ? 24 : 28);
         h_min = (S * 100) / factor;
@@ -122,30 +119,18 @@ export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResu
     let Mx = { neg_cont: 0, pos_dead: 0, pos_live: 0, neg_discont: 0, design: 0 };
     let My = { neg_cont: 0, pos_dead: 0, pos_live: 0, neg_discont: 0, design: 0 };
     
-    // ✅ Logic: Cantilever Calculation
     if (isCantilever) {
-        // Assume S (Short side) is the overhang length
-        const M_cant = (w_total * S**2) / 2; // wL^2 / 2
-        
-        // Assume Cantilever direction matches the shortest dimension input
-        if (lx <= ly) {
-            Mx.design = M_cant; Mx.neg_cont = M_cant; // Negative Moment!
-            My.design = 0; // Temp bar
-        } else {
-            My.design = M_cant; My.neg_cont = M_cant;
-            Mx.design = 0;
-        }
-    } 
-    else if (isOneWay) {
+        // Assume Cantilever spans in the direction of 'S' (Shortest)
+        const M_cant = (w_total * S**2) / 2;
+        if (lx <= ly) { Mx.design = M_cant; Mx.neg_cont = M_cant; } // Main X
+        else { My.design = M_cant; My.neg_cont = M_cant; } // Main Y
+    } else if (isOneWay) {
         const isMainX = lx <= ly; 
         const contMain = isMainX ? nCont_Ly : nCont_Lx;
         const div = contMain > 0 ? 10 : 8;
         const M_main = (w_total * S**2) / div; 
-        
-        if (isMainX) { Mx.design = M_main; My.design = 0; } 
-        else { My.design = M_main; Mx.design = 0; }
+        if (isMainX) Mx.design = M_main; else My.design = M_main;
     } else {
-        // ... (Two Way Logic same as before) ...
         const C = getCoefficients(caseNum, m);
         const Ma_neg = C.ca_neg * w_total * S**2;
         const Ma_pos = (C.ca_dl * LF.DL * w_dead + C.ca_ll * LF.LL * ll) * S**2;
@@ -168,15 +153,13 @@ export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResu
     const calcAs = (Mu_kgm: number, d_cm: number) => {
         const minRho = input.steelType === 'SR24' ? 0.0025 : 0.0018;
         const As_min = minRho * 100 * thickness;
-        
-        if (Mu_kgm <= 50) return As_min; 
+        if (Mu_kgm <= 10) return As_min; // Min Check
 
         const Mu_kgcm = Mu_kgm * 100;
         const Rn = Mu_kgcm / (PHI.FLEXURE_MAX * 100 * d_cm * d_cm);
         const ratio = fy / (0.85 * fc);
         const rootTerm = 1 - (2*ratio*Rn)/fy;
         let rho = (rootTerm >= 0) ? (1/ratio) * (1 - Math.sqrt(rootTerm)) : minRho*2; 
-        
         return Math.max(rho * 100 * d_cm, As_min);
     };
 
@@ -189,39 +172,32 @@ export const calculateSlab = (input: SlabInput, lang: Language = 'th'): SlabResu
     const spacing_req_y = getSpacing(As_req_y);
 
     // Shear
-    let Vu = (w_total * S) / 2;
-    if (isCantilever) Vu = w_total * S; // ✅ Fix: Cantilever Shear = wL
-
+    let Vu = isCantilever ? w_total * S : (w_total * S) / 2;
     const Vc = 0.53 * Math.sqrt(fc) * 100 * Math.min(d_x, d_y); 
     const shearStatus = Vu <= PHI.SHEAR * Vc ? 'PASS' : 'FAIL';
-    const momentStatus = 'PASS'; 
 
     const volConcrete = (lx * ly * thickness) / 100;
-    const weightSteel = ((As_req_x + As_req_y) / 10000) * (lx * ly) * 7850 * 1.1; 
+    const weightSteel = ((As_req_x + As_req_y) / 10000) * (lx * ly) * CONSTANTS.MATERIAL_WEIGHTS.STEEL * 1.1; 
     const areaForm = lx * ly;
     const estCost = (volConcrete * MATERIAL_COSTS.CONCRETE_M3) + (weightSteel * MATERIAL_COSTS.REBAR_KG) + (areaForm * MATERIAL_COSTS.FORMWORK_M2);
 
-    const caseName = lang === 'th' 
-        ? (SLAB_DATA.CASES.find(c=>c.id===caseNum) as any)?.name_th 
-        : (SLAB_DATA.CASES.find(c=>c.id===caseNum) as any)?.name_en;
+    const caseName = lang === 'th' ? (SLAB_DATA.CASES.find(c=>c.id===caseNum) as any)?.name_th : (SLAB_DATA.CASES.find(c=>c.id===caseNum) as any)?.name_en;
 
-    // Report Note Generation
     let designNote = "";
     if (isCantilever) designNote = "Cantilever Slab (Top Bars Only)";
     else if (isOneWay) designNote = "One-Way Slab (Bottom Bars)";
     else designNote = `Two-Way Case ${caseNum} (Bottom Mesh)`;
 
     return {
-        type: isCantilever ? 'Cantilever' : (isOneWay ? 'One-way' : 'Two-way'), // ✅ Valid Type
+        type: isCantilever ? 'Cantilever' : (isOneWay ? 'One-way' : 'Two-way'),
         caseType: caseNum, m_ratio: m, 
         w_total, factors: { DL: LF.DL, LL: LF.LL },
         h_min, h_status,
         momentX: Mx, momentY: My, d_x, d_y, 
         As_req_x, As_req_y, spacing_req_x, spacing_req_y,
         spacing_x: spacing_req_x, spacing_y: spacing_req_y,
-        
         status: (h_status==='PASS' && shearStatus==='PASS') ? 'PASS' : 'FAIL',
-        momentStatus, shearStatus,
+        momentStatus: 'PASS', shearStatus,
         note: designNote,
         volConcrete, weightSteel, areaForm, estCost,
         reportSteps: [

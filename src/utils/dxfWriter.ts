@@ -24,11 +24,6 @@ export class DxfWriter {
         this.content.push(`0\nCIRCLE\n8\n${layer}\n10\n${cx}\n20\n${cy}\n40\n${r}`);
     }
 
-    // ✅ New: Arc support for Spiral Plan
-    public addArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number, layer: string) {
-        this.content.push(`0\nARC\n8\n${layer}\n10\n${cx}\n20\n${cy}\n40\n${r}\n50\n${startAngle}\n51\n${endAngle}`);
-    }
-
     public addText(x: number, y: number, height: number, text: string, layer: string, rotation: number = 0) {
         this.content.push(`0\nTEXT\n8\n${layer}\n10\n${x}\n20\n${y}\n40\n${height}\n1\n${text}\n50\n${rotation}`);
     }

@@ -27,14 +27,11 @@ export const ToolHeader = ({ title, onBack, std, setStd, lang, setLang, isPro = 
                         {title}
                     </h1>
                     
-                    {/* ✅ ปรับสี Badge ใหม่ตามคำขอ */}
                     {isPro ? (
-                        // PRO = โทนเขียว (Premium Green)
                         <span className="text-[10px] bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black px-3 py-1 rounded-full tracking-widest shadow-lg shadow-green-500/30 flex items-center gap-1 transform scale-90 md:scale-100 border border-green-400/20">
                             <span>★</span> PRO
                         </span>
                     ) : (
-                        // DEMO = โทนเหลือง (Warning Yellow)
                         <span className="text-[10px] bg-yellow-500/10 text-yellow-400 font-bold px-3 py-1 rounded-full tracking-widest border border-yellow-500/50 shadow-lg shadow-yellow-500/10 transform scale-90 md:scale-100 flex items-center gap-1">
                             <span>⚠</span> DEMO
                         </span>

@@ -25,8 +25,8 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
     let stepX = startX + L_Bot;
     let stepY = startY;
     for (let i = 0; i < numSteps; i++) {
-        dxf.addLine(stepX, stepY, stepX, stepY + R, "CONCRETE"); // Riser
-        dxf.addLine(stepX, stepY + R, stepX + G, stepY + R, "CONCRETE"); // Going
+        dxf.addLine(stepX, stepY, stepX, stepY + R, "CONCRETE"); 
+        dxf.addLine(stepX, stepY + R, stepX + G, stepY + R, "CONCRETE"); 
         stepX += G;
         stepY += R;
     }
@@ -49,7 +49,7 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
     // Top Landing Soffit
     dxf.addLine(endX, endY - W, cornerTopX, cornerTopY, "CONCRETE");
 
-    // ✅ Advanced Soffit Logic
+    // Soffit Logic
     if (input.structType === 'Slab' || input.structType === 'Spiral') {
         // Slab Type: Straight Line Soffit
         dxf.addLine(cornerTopX, cornerTopY, cornerBotX, cornerBotY, "CONCRETE");
@@ -59,31 +59,19 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
         dxf.addLine(cornerBotX, cornerBotY + barOff, cornerTopX, cornerTopY + barOff, "REBAR_MAIN");
 
     } else {
-        // ✅ Zigzag Type: Stepped Soffit (Polyline effect)
-        // We trace steps backwards from Top to Bot, shifted down by W (vertical approx)
-        // Note: For true perpendicular W, geometry is complex. Vertical W is standard for drafting logic.
-        
+        // Zigzag Type: Stepped Soffit (Backwards tracing)
         let zigX = cornerTopX;
-        let zigY = cornerTopY; // Already shifted by W from Top Surface
-        
-        // Connect Top Landing Corner to first step soffit
-        // Actually, for Zigzag, the soffit follows the step profile.
+        let zigY = cornerTopY; 
         
         for (let i = 0; i < numSteps; i++) {
-            // Draw Going (Backwards)
+            // Going (Backwards)
             dxf.addLine(zigX, zigY, zigX - G, zigY, "CONCRETE");
             zigX -= G;
-            
-            // Draw Riser (Downwards)
+            // Riser (Downwards)
             dxf.addLine(zigX, zigY, zigX, zigY - R, "CONCRETE");
             zigY -= R;
         }
-        // At this point zigX should equal cornerBotX (L_Bot) and zigY should equal cornerBotY (0)
-        
-        // Rebar (Zigzag) - Follows the steps (Bent bar)
-        // Simplify: Just draw a straight line for schematic, or detailed bent bar?
-        // Let's draw schematic straight line through centroid for clarity, or offset steps.
-        // Simplified for DXF: Straight line (easier to read)
+        // Rebar (Zigzag) - Simplified straight line for schematic
         dxf.addLine(cornerBotX, cornerBotY + Cov, cornerTopX, cornerTopY + Cov, "REBAR_MAIN");
     }
 
@@ -94,7 +82,7 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
     // Text & Dimensions
     dxf.addText(L_Bot + (numSteps*G)/2, (numSteps*R)/2 + 500, 150, `Main: DB${input.mainBarDia}@${input.spacing}`, "DIMENSION");
 
-    // --- 2. ✅ SPIRAL PLAN VIEW (Added to the right) ---
+    // --- 2. SPIRAL PLAN VIEW (Added to the right) ---
     if (input.structType === 'Spiral' && input.spiralRadius && input.spiralSweep) {
         const cx = endX + 2000; // Shift Plan View to right
         const cy = (endY / 2);  // Center Y
@@ -103,16 +91,12 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
         
         // Circles
         dxf.addCircle(cx, cy, R_in, "CONCRETE");
-        dxf.addCircle(cx, cy, R_out, "CONCRETE"); // If sweep < 360, should be Arc? 
-        // For standard plan, we usually draw full circles or arcs. 
-        // Let's use ARCs if sweep is defined.
-        // Note: DXF Arc angles are counter-clockwise from X-axis.
-        // We'll just draw circles for boundary to be safe/simple, and arcs for sweep.
+        dxf.addCircle(cx, cy, R_out, "CONCRETE"); 
         
         // Steps (Radial Lines)
         const angleStep = input.spiralSweep / numSteps;
         for(let i=0; i<=numSteps; i++) {
-            const angleDeg = 90 - (i * angleStep); // Start from top (90 deg) going CW?
+            const angleDeg = 90 - (i * angleStep); 
             const angleRad = angleDeg * (Math.PI / 180);
             
             const x1 = cx + R_in * Math.cos(angleRad);
@@ -123,7 +107,6 @@ export const generateStairDxf = (input: StairInput, res: StairResult): string =>
             dxf.addLine(x1, y1, x2, y2, "CONCRETE");
         }
         
-        // Walking Line (Dashed) - Layer REBAR_TEMP (Yellow)
         const R_walk = R_in + 0.6 * (R_out - R_in);
         dxf.addCircle(cx, cy, R_walk, "REBAR_TEMP");
         dxf.addText(cx, cy - R_out - 200, 150, "Spiral Plan View", "DIMENSION");

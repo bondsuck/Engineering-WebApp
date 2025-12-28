@@ -91,7 +91,6 @@ const StairView = ({ structType, supportType, landingSupport, numSteps, riser, g
         pathBot += `L ${sx(L_Bot + numSteps*G + L_Top)} ${sy(numSteps*R - W)} L ${sx(L_Bot + numSteps*G)} ${sy(numSteps*R - W)}`;
         pathBot += ` L ${sx(L_Bot)} ${sy(0 - W)} L ${sx(0)} ${sy(0 - W)} L ${sx(0)} ${sy(0)} Z`; 
     } else {
-        // Zigzag logic adjusted for visual
         pathBot += ` L ${sx(L_Bot + numSteps*G)} ${sy(numSteps*R - W)}`;
         for (let i = numSteps - 1; i >= 0; i--) {
             const stepX = L_Bot + (i * G);
