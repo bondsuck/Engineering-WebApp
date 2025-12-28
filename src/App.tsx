@@ -12,6 +12,11 @@ import Login from './pages/Login';
 import RCBeamDesignTool from './tools/RCBeamDesignTool'; 
 import RCColumnDesignTool from './tools/RCColumnDesignTool';
 import PileCapDesignTool from './tools/PileCapDesignTool';
+// ... imports เดิม
+import RCSlabDesignTool from './tools/RCSlabDesignTool';
+import IsolatedFootingTool from './tools/IsolatedFootingTool';
+import StaircaseDesignTool from './tools/StaircaseDesignTool';
+import RetainingWallTool from './tools/RetainingWallTool';
 
 const App = () => {
     const [session, setSession] = useState<Session | null>(null);
@@ -141,6 +146,32 @@ const App = () => {
                                 <Navigate to="/" replace />
                             )
                         } 
+                    />
+                    {/* ✅ เพิ่ม RC Slab */}
+                    <Route 
+                        path="/rc-slab" 
+                        element={session ? <RCSlabDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
+                    />
+
+                    {/* ✅ เพิ่ม Isolated Footing */}
+                    <Route 
+                        path="/isolated-footing" 
+                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/isolated-footing" ด้วยนะครับ (เดิมใน code อาจจะยังไม่มี path)
+                        element={session ? <IsolatedFootingTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
+                    />
+
+                    {/* ✅ เพิ่ม Staircase */}
+                    <Route 
+                        path="/staircase" 
+                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/staircase" ด้วย
+                        element={session ? <StaircaseDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
+                    />
+
+                    {/* ✅ เพิ่ม Retaining Wall */}
+                    <Route 
+                        path="/retaining-wall" 
+                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/retaining-wall" ด้วย
+                        element={session ? <RetainingWallTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
                     />
                 </Routes>
             </div>

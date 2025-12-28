@@ -13,7 +13,7 @@ import {
     Columns, Grid3x3, SquareStack, StepForward, Fence, Link, Anchor, 
     TableProperties, Scale, ScanText, Lock, ChevronRight, Hammer, 
     Activity, Wind, Mail, MessageCircle, Bug, Phone, 
-    X, Send, RotateCcw // เพิ่มไอคอนสำหรับ Modal
+    X, Send, RotateCcw
 } from 'lucide-react';
 
 // --- Custom Icons ---
@@ -34,7 +34,7 @@ const ActivityGraphIcon = ({ size, className }: { size: number, className?: stri
 type ToolCategory = 'concrete' | 'steel' | 'analysis' | 'qto' | 'ai' | 'contact';
 
 interface ToolCardProps {
-    id?: string; // เพิ่ม ID เพื่อใช้เช็ค Action
+    id?: string;
     title: string;
     description: string;
     icon: React.ReactNode;
@@ -42,19 +42,64 @@ interface ToolCardProps {
     isPro?: boolean;
     isNew?: boolean;
     status?: 'available' | 'coming_soon' | 'porting';
-    actionType?: 'link' | 'modal'; // ระบุประเภทการทำงาน
+    actionType?: 'link' | 'modal';
 }
 
-// 🛠️ ข้อมูลเครื่องมือ
+// 🛠️ ข้อมูลเครื่องมือ (แก้ไขส่วนที่ Error แล้ว)
 const toolsData: Record<ToolCategory, ToolCardProps[]> = {
     concrete: [
-        { title: "RC Beam Design", description: "ออกแบบคาน คสล. วิธี USD (ACI/วสท.)", icon: <RCBeamIcon size={42} className="text-blue-400" />, path: "/rc-beam", status: 'available' },
-        { title: "RC Column Design", description: "ออกแบบเสา คสล. (P-M Interaction)", icon: <Columns size={40} className="text-slate-400" />, path: "/rc-column", isNew: true, status: 'available' },
-        { title: "RC Slab Design", description: "ออกแบบพื้น คสล. ทางเดียวและสองทาง", icon: <Grid3x3 size={40} className="text-slate-400" />, path: "/rc-slab", status: 'coming_soon' },
-        { title: "Isolated Footing", description: "ออกแบบฐานรากแผ่เดี่ยว", icon: <SquareStack size={40} className="text-slate-400" />, status: 'coming_soon' },
-        { title: "Pile Cap Design", description: "ออกแบบฐานรากเสาเข็ม (2-6 ต้น)", icon: <PileCapIcon size={42} className="text-slate-400" />, path: "/pile-cap", isNew: true, status: 'available' },
-        { title: "Staircase Design", description: "ออกแบบบันได คสล.", icon: <StepForward size={40} className="text-slate-400" />, status: 'coming_soon' },
-        { title: "Retaining Wall", description: "ออกแบบกำแพงกันดิน", icon: <Fence size={40} className="text-slate-400" />, status: 'coming_soon' }
+        { 
+            title: "RC Beam Design", 
+            description: "ออกแบบคาน คสล. วิธี USD (ACI/วสท.)", 
+            icon: <RCBeamIcon size={42} className="text-blue-400" />, 
+            path: "/rc-beam", 
+            status: 'available' 
+        },
+        { 
+            title: "RC Column Design", 
+            description: "ออกแบบเสา คสล. (P-M Interaction)", 
+            icon: <Columns size={40} className="text-slate-400" />, 
+            path: "/rc-column", 
+            isNew: true, 
+            status: 'available' 
+        },
+        { 
+            title: "RC Slab Design", 
+            description: "ออกแบบพื้น คสล. ทางเดียวและสองทาง", 
+            icon: <Grid3x3 size={40} className="text-slate-400" />, 
+            path: "/rc-slab", 
+            status: 'available' 
+        },
+        { 
+            title: "Pile Cap Design", 
+            description: "ออกแบบฐานรากเสาเข็ม (2-6 ต้น)", 
+            icon: <PileCapIcon size={42} className="text-slate-400" />, 
+            path: "/pile-cap", 
+            isNew: true, 
+            status: 'available' 
+        },
+        // ✅ แก้ไขส่วนที่ Error (เติมข้อมูลให้ครบ)
+        { 
+            title: "Isolated Footing", 
+            description: "ออกแบบฐานรากแผ่เดี่ยว", 
+            icon: <SquareStack size={40} className="text-slate-400" />, 
+            path: "/isolated-footing", 
+            status: 'available' 
+        },
+        { 
+            title: "Staircase Design", 
+            description: "ออกแบบบันได คสล.", 
+            icon: <StepForward size={40} className="text-slate-400" />, 
+            path: "/staircase", 
+            status: 'available' 
+        },
+        { 
+            title: "Retaining Wall", 
+            description: "ออกแบบกำแพงกันดิน", 
+            icon: <Fence size={40} className="text-slate-400" />, 
+            path: "/retaining-wall", 
+            status: 'available' 
+        }
     ],
     steel: [
         { title: "Steel Beam Check", description: "ตรวจสอบหน้าตัดคานเหล็กรูปพรรณ", icon: <IBeamIcon size={42} className="text-slate-400" />, isPro: true, status: 'coming_soon' },
@@ -105,7 +150,7 @@ const toolsData: Record<ToolCategory, ToolCardProps[]> = {
             description: "สอบถามข้อมูลผ่าน Line OA",
             icon: <MessageCircle size={40} className="text-green-400" />,
             status: 'available',
-            path: "https://lin.ee/AhrrZLg", // ✅ ลิงก์ใหม่
+            path: "https://lin.ee/AhrrZLg",
             actionType: 'link'
         },
         {
@@ -124,7 +169,7 @@ const Dashboard = () => {
     const navigate = useNavigate();
 
     // --- Modal State ---
-    const [modalType, setModalType] = useState<string | null>(null); // 'hotline' | 'support' | 'bug'
+    const [modalType, setModalType] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         subject: '',
         name: '',
@@ -147,7 +192,6 @@ const Dashboard = () => {
         if (tool.status !== 'available') return;
 
         if (tool.actionType === 'modal' && tool.id) {
-            // เปิด Modal ตาม ID
             setModalType(tool.id);
             setFormData({ subject: '', name: '', phone: '', email: '', details: '' }); // Reset Form
         } else if (tool.path) {
@@ -183,7 +227,6 @@ const Dashboard = () => {
             body = `Name: ${formData.name}\nPhone: ${formData.phone}\nEmail: ${formData.email}\n\nBug Details:\n${formData.details}`;
         }
 
-        // สร้าง mailto link (ใช้ encodeURIComponent เพื่อให้รองรับภาษาไทยและอักขระพิเศษ)
         const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         
         window.location.href = mailtoLink;
