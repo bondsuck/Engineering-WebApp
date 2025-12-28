@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface Props {
     structType: 'Slab' | 'Zigzag' | 'Spiral';
     supportType: 'Longitudinal' | 'Cantilever';

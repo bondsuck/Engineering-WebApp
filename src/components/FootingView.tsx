@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface Props {
     bx: number; // m
     by: number; // m

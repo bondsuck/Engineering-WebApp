@@ -1,4 +1,3 @@
-import React from 'react';
 import { THEME } from '../constants';
 
 interface ColumnSectionProps {

@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface Props {
     bx: number; // m
     thickness: number; // cm
@@ -7,10 +5,10 @@ interface Props {
     df: number; // m
     q_max: number; // T/m2
     q_min: number; // T/m2
-    rebarX: string;
+
 }
 
-const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min, rebarX }: Props) => {
+const FootingSectionView = ({ bx, thickness, col_x, df, q_max, q_min }: Props) => {
     const padding = 50;
     const w_scale = 200 / Math.max(bx, df*1.5);
     

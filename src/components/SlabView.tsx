@@ -1,4 +1,3 @@
-import React from 'react';
 // ✅ Import THEME มาใช้
 import { THEME } from '../constants';
 
