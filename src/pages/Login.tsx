@@ -66,7 +66,7 @@ export default function Login() {
         setSuccessMsg(null);
     };
 
-    // 🔑 ฟังก์ชัน Login (ปรับปรุงใหม่: ตัดการเช็ค Approve ที่ซับซ้อนออก)
+    // 🔑 ฟังก์ชัน Login
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true); setErrorMsg(null); setSuccessMsg(null);
@@ -75,14 +75,14 @@ export default function Login() {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
             
-            // ✅ ล็อกอินผ่านแล้ว ไม่ต้องเช็ค is_approved ที่ Frontend 
-            // เพราะเราตั้งค่า Default True ใน Database แล้ว
-            // App.tsx จะจับ Session เองอัตโนมัติ
+            // Login สำเร็จ: App.tsx จะจับ session change เอง
 
         } catch (err: any) { 
-            // เช็คกรณีอีเมลยังไม่ยืนยัน
+            // Handle error specific cases
             if (err.message.includes("Email not confirmed")) {
                 setErrorMsg("⚠️ กรุณายืนยันอีเมลของท่านก่อนเข้าใช้งาน (ตรวจสอบใน Inbox/Junk)");
+            } else if (err.message.includes("Invalid login credentials")) {
+                 setErrorMsg("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
             } else {
                 setErrorMsg(err.message || "การเข้าสู่ระบบล้มเหลว"); 
             }
@@ -91,16 +91,18 @@ export default function Login() {
         }
     };
 
-    // 📝 ฟังก์ชันลงทะเบียน (Register) - ปรับใหม่ให้ใช้ Trigger
+    // 📝 ฟังก์ชันลงทะเบียน (Register)
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!agreed) { setErrorMsg("กรุณายอมรับเงื่อนไขการใช้บริการ"); return; }
         
+        // Frontend Validation
+        if (!agreed) { setErrorMsg("กรุณายอมรับเงื่อนไขการใช้บริการ"); return; }
+        if (password.length < 6) { setErrorMsg("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร"); return; }
+
         setLoading(true); setErrorMsg(null); setSuccessMsg(null);
         
         try {
-            // ✅ ส่งข้อมูล User Profile ผ่าน options.data
-            // Database Trigger จะดึงข้อมูลตรงนี้ไปสร้าง Profile ให้เองอัตโนมัติ
+            // ✅ ส่งข้อมูล User Profile ผ่าน options.data -> Trigger จะรับช่วงต่อ
             const { error } = await supabase.auth.signUp({ 
                 email, 
                 password,
@@ -109,17 +111,24 @@ export default function Login() {
                         first_name: fname,
                         last_name: lname,
                         phone_number: phone,
-                        consent_agreed: true
+                        consent_agreed: true // ส่งยืนยันไปที่ DB
                     }
                 }
             });
 
             if (error) throw error;
             
-            // ✅ แจ้งเตือนให้ไปเช็คอีเมล
+            // ✅ Reset Form ทั้งหมดเมื่อสำเร็จ (เพื่อ UX ที่ดี)
+            setFname("");
+            setLname("");
+            setPhone("");
+            setEmail("");
+            setPassword("");
+            setAgreed(false);
+
+            // แจ้งเตือนและกลับไปหน้า Login
             setSuccessMsg("✉️ ลงทะเบียนสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตนก่อนเข้าใช้งาน");
-            setIsLoginView(true); // กลับไปหน้า Login
-            setPassword(""); 
+            setIsLoginView(true);
             
         } catch (err: any) { 
             setErrorMsg(err.message || "การลงทะเบียนล้มเหลว"); 
@@ -129,7 +138,7 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 font-sans">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300">
             <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in-up">
                 
                 {/* Header */}
@@ -143,13 +152,13 @@ export default function Login() {
 
                 {/* Tab Switcher */}
                 <div className="flex border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
-                    <button onClick={() => switchTab(true)} className={`flex-1 py-4 text-sm font-bold transition-all ${isLoginView ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 dark:bg-blue-900/10' : 'text-slate-400 hover:text-slate-600'}`}>เข้าสู่ระบบ</button>
-                    <button onClick={() => switchTab(false)} className={`flex-1 py-4 text-sm font-bold transition-all ${!isLoginView ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 dark:bg-blue-900/10' : 'text-slate-400 hover:text-slate-600'}`}>ลงทะเบียนใหม่</button>
+                    <button onClick={() => switchTab(true)} className={`flex-1 py-4 text-sm font-bold transition-all ${isLoginView ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 dark:bg-blue-900/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>เข้าสู่ระบบ</button>
+                    <button onClick={() => switchTab(false)} className={`flex-1 py-4 text-sm font-bold transition-all ${!isLoginView ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 dark:bg-blue-900/10' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>ลงทะเบียนใหม่</button>
                 </div>
 
                 <div className="p-8">
                     {/* Alerts */}
-                    {errorMsg && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl flex items-start gap-3 text-sm text-red-600 dark:text-red-400"><AlertTriangle size={18} className="shrink-0 mt-0.5"/><span>{errorMsg}</span></div>}
+                    {errorMsg && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl flex items-start gap-3 text-sm text-red-600 dark:text-red-400 animate-pulse"><AlertTriangle size={18} className="shrink-0 mt-0.5"/><span>{errorMsg}</span></div>}
                     {successMsg && <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl flex items-start gap-3 text-sm text-green-600 dark:text-green-400"><CheckCircle size={18} className="shrink-0 mt-0.5"/><span>{successMsg}</span></div>}
 
                     {isLoginView ? (
@@ -158,14 +167,14 @@ export default function Login() {
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">อีเมล</label>
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-3 text-slate-400" size={20} />
-                                    <input type="email" required placeholder="your@email.com" className="w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all" value={email} onChange={(e) => setEmail(e.target.value)} />
+                                    <input type="email" required placeholder="your@email.com" className="w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all placeholder:text-slate-400" value={email} onChange={(e) => setEmail(e.target.value)} />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">รหัสผ่าน</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-                                    <input type="password" required placeholder="••••••••" className="w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all" value={password} onChange={(e) => setPassword(e.target.value)} />
+                                    <input type="password" required placeholder="••••••••" className="w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all placeholder:text-slate-400" value={password} onChange={(e) => setPassword(e.target.value)} />
                                 </div>
                             </div>
                             <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 active:scale-[0.98]">
@@ -175,17 +184,20 @@ export default function Login() {
                     ) : (
                         <form onSubmit={handleRegister} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">ชื่อจริง</label><input type="text" className="w-full px-4 py-3 border dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white" value={fname} onChange={e => setFname(e.target.value)} required /></div>
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">นามสกุล</label><input type="text" className="w-full px-4 py-3 border dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white" value={lname} onChange={e => setLname(e.target.value)} required /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ชื่อจริง</label><input type="text" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={fname} onChange={e => setFname(e.target.value)} required /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">นามสกุล</label><input type="text" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={lname} onChange={e => setLname(e.target.value)} required /></div>
                             </div>
-                            <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">เบอร์โทรศัพท์</label><input type="tel" className="w-full px-4 py-3 border dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">อีเมลสมาชิก</label><input type="email" className="w-full px-4 py-3 border dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">ตั้งรหัสผ่าน</label><input type="password" placeholder="Min. 6 characters" className="w-full px-4 py-3 border dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 dark:text-white" value={password} onChange={e => setPassword(e.target.value)} required /></div>
+                            <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">เบอร์โทรศัพท์</label><input type="tel" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
+                            <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">อีเมลสมาชิก</label><input type="email" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} required /></div>
+                            <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ตั้งรหัสผ่าน</label><input type="password" placeholder="Min. 6 characters" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} required /></div>
                             
-                            <div className="h-32 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl text-[11px] text-slate-500 leading-relaxed shadow-inner"><pre className="whitespace-pre-wrap font-sans">{CONSENT_TEXT}</pre></div>
-                            <label className="flex items-start gap-3 cursor-pointer p-1"><input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} /><span className="text-xs text-slate-600 dark:text-slate-400 font-medium">ข้าพเจ้ายอมรับข้อตกลงและเงื่อนไข และยินยอมให้จัดเก็บอีเมลเพื่อการสื่อสาร</span></label>
+                            <div className="h-32 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed shadow-inner scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"><pre className="whitespace-pre-wrap font-sans">{CONSENT_TEXT}</pre></div>
+                            <label className="flex items-start gap-3 cursor-pointer p-1 group">
+                                <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                                <span className="text-xs text-slate-600 dark:text-slate-400 font-medium group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">ข้าพเจ้ายอมรับข้อตกลงและเงื่อนไข และยินยอมให้จัดเก็บอีเมลเพื่อการสื่อสาร</span>
+                            </label>
                             
-                            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl mt-2 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 active:scale-[0.98]">
+                            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl mt-2 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed">
                                 {loading ? <Loader2 className="animate-spin" size={22}/> : "ยืนยันการสมัครสมาชิก"}
                             </button>
                         </form>
