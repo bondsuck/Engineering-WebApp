@@ -256,7 +256,7 @@ const Dashboard = () => {
                                 <PartyPopper size={40} />
                             </div>
                             
-                            <h2 className="text-3xl font-black mb-2 text-slate-800 dark:text-white">Happy New Year 2025!</h2>
+                            <h2 className="text-3xl font-black mb-2 text-slate-800 dark:text-white">Happy New Year 2026!</h2>
                             <p className="text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
                                 สวัสดีปีใหม่ครับ! ขอให้ปีนี้เป็นปีแห่งความสำเร็จ<br/>
                                 การออกแบบโครงสร้างที่มั่นคง และงานก่อสร้างที่ราบรื่น<br/>
