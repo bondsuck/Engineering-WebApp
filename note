@@ -20,6 +20,6 @@ npm install
 PowerShell
 
 git add .
-git commit -m "อธิบายสั้นๆ ว่าแก้อะไรไป"
+git commit -m "อธิบายสั้นๆ ว่าแ  ก้อะไรไป"
 git push
 (เช่น git commit -m "fix pile cap calculation" หรือ git commit -m "change button color")_
