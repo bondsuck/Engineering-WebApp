@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient'; 
-import { Lock, Mail, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Lock, Mail, CheckCircle, AlertTriangle, Loader2, Eye, EyeOff } from 'lucide-react'; // ✅ เพิ่ม Eye, EyeOff
 
 // ข้อความยินยอม (Consent)
 const CONSENT_TEXT = `ข้อตกลงและเงื่อนไขการใช้งาน (Terms of Service)
@@ -55,19 +55,24 @@ export default function Login() {
     // Form States
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState(""); // ✅ เพิ่ม State ยืนยันรหัสผ่าน
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [fname, setFname] = useState("");
     const [lname, setLname] = useState("");
     const [phone, setPhone] = useState("");
     const [agreed, setAgreed] = useState(false);
 
-    // ✅ ปรับปรุงการสลับ Tab ให้ล้างรหัสผ่านเสมอ เพื่อกัน Browser แอบกรอก
+    // ✅ Toggle Password Visibility
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const switchTab = (toLogin: boolean) => {
         setIsLoginView(toLogin);
         setErrorMsg(null);
         setSuccessMsg(null);
         setPassword("");
         setConfirmPassword("");
+        setShowPassword(false);
+        setShowConfirmPassword(false);
     };
 
     // 🔑 ฟังก์ชัน Login
@@ -95,10 +100,9 @@ export default function Login() {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // 🛡️ Frontend Validation ใหม่
         if (!agreed) { setErrorMsg("กรุณายอมรับเงื่อนไขการใช้บริการ"); return; }
         if (password.length < 6) { setErrorMsg("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร"); return; }
-        if (password !== confirmPassword) { setErrorMsg("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"); return; } // ✅ เช็คว่าตรงกันไหม
+        if (password !== confirmPassword) { setErrorMsg("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"); return; }
 
         setLoading(true); setErrorMsg(null); setSuccessMsg(null);
         
@@ -118,7 +122,6 @@ export default function Login() {
 
             if (error) throw error;
             
-            // ✅ Reset Form
             setFname(""); setLname(""); setPhone(""); setEmail("");
             setPassword(""); setConfirmPassword(""); setAgreed(false);
 
@@ -152,7 +155,6 @@ export default function Login() {
                 </div>
 
                 <div className="p-8">
-                    {/* Alerts */}
                     {errorMsg && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl flex items-start gap-3 text-sm text-red-600 dark:text-red-400 animate-pulse"><AlertTriangle size={18} className="shrink-0 mt-0.5"/><span>{errorMsg}</span></div>}
                     {successMsg && <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl flex items-start gap-3 text-sm text-green-600 dark:text-green-400"><CheckCircle size={18} className="shrink-0 mt-0.5"/><span>{successMsg}</span></div>}
 
@@ -169,7 +171,10 @@ export default function Login() {
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">รหัสผ่าน</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-                                    <input type="password" required placeholder="••••••••" className="w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all placeholder:text-slate-400" value={password} onChange={(e) => setPassword(e.target.value)} />
+                                    <input type={showPassword ? "text" : "password"} required placeholder="••••••••" className="w-full pl-11 pr-12 py-3 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition-all placeholder:text-slate-400" value={password} onChange={(e) => setPassword(e.target.value)} />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-blue-500 transition-colors">
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
                                 </div>
                             </div>
                             <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 active:scale-[0.98]">
@@ -185,32 +190,42 @@ export default function Login() {
                             <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">เบอร์โทรศัพท์</label><input type="tel" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
                             <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">อีเมลสมาชิก</label><input type="email" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} required /></div>
                             
-                            {/* ช่องกรอกรหัสผ่าน 1 */}
+                            {/* ช่องรหัสผ่านหลัก + ลูกตา */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ตั้งรหัสผ่าน</label>
-                                <input 
-                                    type="password" 
-                                    autoComplete="new-password" 
-                                    placeholder="Min. 6 characters" 
-                                    className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                                    value={password} 
-                                    onChange={e => setPassword(e.target.value)} 
-                                    required 
-                                />
+                                <div className="relative">
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        autoComplete="new-password" 
+                                        placeholder="Min. 6 characters" 
+                                        className="w-full px-4 pr-12 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                                        value={password} 
+                                        onChange={e => setPassword(e.target.value)} 
+                                        required 
+                                    />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-blue-500">
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* ✅ ช่องกรอกรหัสผ่าน 2 (Confirm Password) */}
+                            {/* ช่องยืนยันรหัสผ่าน + ลูกตา */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ยืนยันรหัสผ่านอีกครั้ง</label>
-                                <input 
-                                    type="password" 
-                                    autoComplete="new-password" 
-                                    placeholder="Confirm your password" 
-                                    className={`w-full px-4 py-3 border rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 outline-none transition-all ${confirmPassword && password !== confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'}`} 
-                                    value={confirmPassword} 
-                                    onChange={e => setConfirmPassword(e.target.value)} 
-                                    required 
-                                />
+                                <div className="relative">
+                                    <input 
+                                        type={showConfirmPassword ? "text" : "password"} 
+                                        autoComplete="new-password" 
+                                        placeholder="Confirm your password" 
+                                        className={`w-full px-4 pr-12 py-3 border rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 outline-none transition-all ${confirmPassword && password !== confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'}`} 
+                                        value={confirmPassword} 
+                                        onChange={e => setConfirmPassword(e.target.value)} 
+                                        required 
+                                    />
+                                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-blue-500">
+                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                                 {confirmPassword && password !== confirmPassword && (
                                     <p className="text-[10px] text-red-500 mt-1 font-bold italic">รหัสผ่านไม่ตรงกัน</p>
                                 )}
