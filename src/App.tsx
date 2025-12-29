@@ -22,17 +22,44 @@ const App = () => {
     const [isPro, setIsPro] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
-    // 🔒 ฟังก์ชันความปลอดภัย: เช็คว่า User ยังมีตัวตนจริงๆ ใน Server ไหม?
-    const validateUserSession = async () => {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-            console.warn("Security Alert: User not found or token invalid. Forcing logout.");
-            await supabase.auth.signOut();
-            setSession(null);
-            setIsPro(false);
+    // 🔒 ฟังก์ชันความปลอดภัยระดับสูงสุด: เช็คทั้ง Auth และ Profile
+    const validateUserIntegrity = async () => {
+        try {
+            // 1. เช็คว่ามีตัวตนในระบบ Auth หรือไม่?
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            
+            if (authError || !user) {
+                throw new Error("Auth user missing");
+            }
+
+            // 2. เช็คว่ามีข้อมูลในตาราง user_profiles หรือไม่? (ถ้าลบแถวทิ้ง = แบน)
+            const { data: profile, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('subscription_plan')
+                .eq('id', user.id)
+                .single();
+
+            // ถ้า Error หรือหาไม่เจอ แสดงว่าโดนลบจากตาราง
+            if (profileError || !profile) {
+                console.warn("User profile missing (Banned). Forcing logout.");
+                throw new Error("Profile missing");
+            }
+
+            return { user, profile };
+
+        } catch (error) {
+            console.warn("Security Check Failed:", error);
+            await handleLogout(); // ดีดออกทันที
             return null;
         }
-        return user;
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setSession(null);
+        setIsPro(false);
+        posthog.reset();
+        setIsLoading(false);
     };
 
     useEffect(() => {
@@ -47,29 +74,30 @@ const App = () => {
         const initSession = async () => {
             setIsLoading(true);
             
-            // เช็ค Session ในเครื่องก่อน (เร็ว)
+            // เช็ค Session เบื้องต้น
             const { data: { session: localSession } } = await supabase.auth.getSession();
             
             if (localSession) {
-                // ถ้ามี Session -> ยิงไปเช็คกับ Server อีกที (ช้ากว่านิดนึงแต่ชัวร์)
-                const validUser = await validateUserSession();
+                // ตรวจสอบความถูกต้องกับ Server (Auth + Profile)
+                const validData = await validateUserIntegrity();
                 
-                if (validUser) {
+                if (validData) {
                     setSession(localSession);
-                    checkProStatus(validUser.id);
-                    identifyPostHogUser(validUser);
+                    
+                    const isUserPro = validData.profile.subscription_plan === 'pro';
+                    setIsPro(isUserPro);
+                    posthog.people.set({ plan: isUserPro ? 'pro' : 'free' });
+                    
+                    identifyPostHogUser(validData.user, isUserPro);
                 }
             } else {
-                setIsLoading(false); // ไม่มี Session เลิกโหลดเลย
+                setIsLoading(false);
             }
-            
-            // จบการโหลด (กรณีมี validUser จะไปจบใน checkProStatus หรือจบตรงนี้ถ้าไม่มี)
-            if (!localSession) setIsLoading(false);
         };
 
         initSession();
 
-        // 3. Listen for Auth Changes (Login/Logout)
+        // 3. Listen for Auth Changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
                 setSession(null);
@@ -78,9 +106,15 @@ const App = () => {
                 setIsLoading(false);
             } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                  if (session) {
-                    setSession(session);
-                    checkProStatus(session.user.id);
-                    identifyPostHogUser(session.user);
+                    // ตรวจสอบทุกครั้งที่มีการ Login หรือ Refresh Token
+                    const validData = await validateUserIntegrity();
+                    if (validData) {
+                        setSession(session);
+                        // Update state from the fresh profile check
+                        const isUserPro = validData.profile.subscription_plan === 'pro';
+                        setIsPro(isUserPro);
+                        identifyPostHogUser(session.user, isUserPro);
+                    }
                  }
             }
         });
@@ -88,35 +122,13 @@ const App = () => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const identifyPostHogUser = (user: any) => {
+    const identifyPostHogUser = (user: any, isProStatus: boolean) => {
         if (user) {
             posthog.identify(user.id, {
                 email: user.email,
-                is_pro: isPro
+                is_pro: isProStatus
             });
         }
-    };
-
-    const checkProStatus = async (userId: string) => {
-        try {
-            const { data } = await supabase
-                .from('user_profiles')
-                .select('subscription_plan')
-                .eq('id', userId)
-                .single();
-            
-            const isUserPro = data?.subscription_plan === 'pro';
-            setIsPro(isUserPro);
-            posthog.people.set({ plan: isUserPro ? 'pro' : 'free' });
-        } catch (error) {
-            console.error("Error fetching pro status:", error);
-        } finally {
-            setIsLoading(false); // โหลดเสร็จแน่นอน
-        }
-    };
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
     };
 
     if (isLoading) {
