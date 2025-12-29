@@ -22,12 +22,13 @@ const App = () => {
     const [isPro, setIsPro] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
-    // 🔒 ฟังก์ชันความปลอดภัย: เช็ค User + Profile
-    const validateUserIntegrity = async () => {
+    // 🛡️ ฟังก์ชันความปลอดภัย (แยกออกมาเพื่อให้ code อ่านง่าย)
+    const validateUserIntegrity = async (currentSession: Session) => {
         try {
-            // 1. เช็ค Auth
+            console.log("Checking User Integrity...");
+            // 1. เช็ค Auth User
             const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) throw new Error("Auth missing");
+            if (authError || !user) throw new Error("Auth User missing");
 
             // 2. เช็ค Profile
             const { data: profile, error: profileError } = await supabase
@@ -38,33 +39,30 @@ const App = () => {
 
             if (profileError || !profile) throw new Error("Profile missing");
 
+            console.log("User Validated:", user.email);
             return { user, profile };
+
         } catch (error) {
-            console.warn("User validation failed:", error);
-            await handleLogout(); // สั่ง Logout ทันทีถ้ามีปัญหา
+            console.warn("Validation Failed:", error);
+            // ถ้าเช็คไม่ผ่าน ให้ Logout ทิ้ง
+            await handleLogout();
             return null;
         }
     };
 
     const handleLogout = async () => {
-        // Clear session ก่อนสั่ง signOut เพื่อป้องกัน UI ค้าง
+        console.log("Logging out...");
         setSession(null);
         setIsPro(false);
         posthog.reset();
         await supabase.auth.signOut();
+        // ไม่ต้อง set isLoading ที่นี่ เพราะจะจัดการใน useEffect หลัก
     };
 
-    const identifyPostHogUser = (user: any, isProStatus: boolean) => {
-        // เช็คก่อนว่ามี Key ไหม เพื่อกันแอปพัง
-        if (user && import.meta.env.VITE_POSTHOG_KEY) {
-            posthog.identify(user.id, {
-                email: user.email,
-                is_pro: isProStatus
-            });
-        }
-    };
-
+    // 🚀 Effect หลัก: ทำงานครั้งเดียวตอนเข้าเว็บ
     useEffect(() => {
+        let mounted = true;
+
         // 1. Init PostHog (Safe Mode)
         if (import.meta.env.VITE_POSTHOG_KEY) {
             try {
@@ -73,70 +71,78 @@ const App = () => {
                     person_profiles: 'identified_only',
                     capture_pageview: false 
                 });
-            } catch (e) {
-                console.error("PostHog Init Error:", e);
-            }
+            } catch (e) { console.error("PostHog Init Error", e); }
         }
 
-        // 2. Start Session Check
-        const initSession = async () => {
-            setIsLoading(true);
+        // 2. ฟังก์ชันเริ่มระบบ
+        const initializeApp = async () => {
             try {
-                // เช็ค Local Session ก่อน
+                // เช็ค Session ในเครื่องก่อน
                 const { data: { session: localSession } } = await supabase.auth.getSession();
                 
-                if (localSession) {
-                    // ถ้ามี Local ให้เช็ค Server ต่อ
-                    const validData = await validateUserIntegrity();
+                if (localSession && mounted) {
+                    // ถ้ามี Session ให้ Validate กับ Server
+                    const validData = await validateUserIntegrity(localSession);
                     
-                    if (validData) {
+                    if (validData && mounted) {
                         setSession(localSession);
                         const isUserPro = validData.profile.subscription_plan === 'pro';
                         setIsPro(isUserPro);
-                        identifyPostHogUser(validData.user, isUserPro);
-                    } else {
-                        // ถ้าไม่ผ่าน validateUserIntegrity มันจะสั่ง Logout ไปแล้ว
-                        // แต่เรา setSession null ซ้ำอีกทีเพื่อความชัวร์
-                        setSession(null);
+                        
+                        // Track User
+                        if (import.meta.env.VITE_POSTHOG_KEY) {
+                            posthog.identify(validData.user.id, { 
+                                email: validData.user.email, 
+                                is_pro: isUserPro 
+                            });
+                        }
                     }
                 }
             } catch (error) {
-                console.error("Session Init Error:", error);
-                setSession(null);
+                console.error("App Init Error:", error);
             } finally {
-                // ✅ สำคัญมาก: ไม่ว่าจะเกิดอะไรขึ้น ต้องสั่งให้หยุดโหลดเสมอ!
-                setIsLoading(false);
+                if (mounted) setIsLoading(false); // ✅ บรรทัดนี้สำคัญสุด: สั่งหยุดโหลดเสมอ
             }
         };
 
-        initSession();
+        initializeApp();
 
-        // 3. Auth Listener
+        // 3. 🚨 SAFETY VALVE: วาล์วนิรภัย
+        // ถ้าผ่านไป 3 วินาทีแล้วยังหมุนอยู่ ให้บังคับหยุดหมุนทันที
+        const safetyTimer = setTimeout(() => {
+            if (mounted && isLoading) {
+                console.warn("Forcing loading stop (Timeout)");
+                setIsLoading(false);
+            }
+        }, 3000);
+
+        // 4. Listener สำหรับการ Login/Logout ภายหลัง
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
                 setSession(null);
                 setIsPro(false);
-                setIsLoading(false);
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                 if (session) {
-                    // ถ้า User Login เข้ามาใหม่ ให้ validate อีกรอบ
-                    const validData = await validateUserIntegrity();
-                    if (validData) {
-                        setSession(session);
-                        const isUserPro = validData.profile.subscription_plan === 'pro';
-                        setIsPro(isUserPro);
-                    }
-                 }
+            } else if (event === 'SIGNED_IN' && session) {
+                setSession(session);
+                // เช็ค Profile อีกรอบตอน Login สำเร็จ
+                const validData = await validateUserIntegrity(session);
+                if (validData) {
+                    setIsPro(validData.profile.subscription_plan === 'pro');
+                }
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            clearTimeout(safetyTimer);
+            subscription.unsubscribe();
+        };
     }, []);
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center gap-4">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+                <p className="text-slate-400 text-sm animate-pulse">Loading System...</p>
             </div>
         );
     }
