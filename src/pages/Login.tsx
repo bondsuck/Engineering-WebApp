@@ -55,15 +55,19 @@ export default function Login() {
     // Form States
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState(""); // ✅ เพิ่ม State ยืนยันรหัสผ่าน
     const [fname, setFname] = useState("");
     const [lname, setLname] = useState("");
     const [phone, setPhone] = useState("");
     const [agreed, setAgreed] = useState(false);
 
+    // ✅ ปรับปรุงการสลับ Tab ให้ล้างรหัสผ่านเสมอ เพื่อกัน Browser แอบกรอก
     const switchTab = (toLogin: boolean) => {
         setIsLoginView(toLogin);
         setErrorMsg(null);
         setSuccessMsg(null);
+        setPassword("");
+        setConfirmPassword("");
     };
 
     // 🔑 ฟังก์ชัน Login
@@ -72,13 +76,9 @@ export default function Login() {
         setLoading(true); setErrorMsg(null); setSuccessMsg(null);
         
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            
-            // Login สำเร็จ: App.tsx จะจับ session change เอง
-
         } catch (err: any) { 
-            // Handle error specific cases
             if (err.message.includes("Email not confirmed")) {
                 setErrorMsg("⚠️ กรุณายืนยันอีเมลของท่านก่อนเข้าใช้งาน (ตรวจสอบใน Inbox/Junk)");
             } else if (err.message.includes("Invalid login credentials")) {
@@ -95,14 +95,14 @@ export default function Login() {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Frontend Validation
+        // 🛡️ Frontend Validation ใหม่
         if (!agreed) { setErrorMsg("กรุณายอมรับเงื่อนไขการใช้บริการ"); return; }
         if (password.length < 6) { setErrorMsg("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร"); return; }
+        if (password !== confirmPassword) { setErrorMsg("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"); return; } // ✅ เช็คว่าตรงกันไหม
 
         setLoading(true); setErrorMsg(null); setSuccessMsg(null);
         
         try {
-            // ✅ ส่งข้อมูล User Profile ผ่าน options.data -> Trigger จะรับช่วงต่อ
             const { error } = await supabase.auth.signUp({ 
                 email, 
                 password,
@@ -111,22 +111,17 @@ export default function Login() {
                         first_name: fname,
                         last_name: lname,
                         phone_number: phone,
-                        consent_agreed: true // ส่งยืนยันไปที่ DB
+                        consent_agreed: true
                     }
                 }
             });
 
             if (error) throw error;
             
-            // ✅ Reset Form ทั้งหมดเมื่อสำเร็จ (เพื่อ UX ที่ดี)
-            setFname("");
-            setLname("");
-            setPhone("");
-            setEmail("");
-            setPassword("");
-            setAgreed(false);
+            // ✅ Reset Form
+            setFname(""); setLname(""); setPhone(""); setEmail("");
+            setPassword(""); setConfirmPassword(""); setAgreed(false);
 
-            // แจ้งเตือนและกลับไปหน้า Login
             setSuccessMsg("✉️ ลงทะเบียนสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตนก่อนเข้าใช้งาน");
             setIsLoginView(true);
             
@@ -189,7 +184,37 @@ export default function Login() {
                             </div>
                             <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">เบอร์โทรศัพท์</label><input type="tel" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
                             <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">อีเมลสมาชิก</label><input type="email" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ตั้งรหัสผ่าน</label><input type="password" placeholder="Min. 6 characters" className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} required /></div>
+                            
+                            {/* ช่องกรอกรหัสผ่าน 1 */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ตั้งรหัสผ่าน</label>
+                                <input 
+                                    type="password" 
+                                    autoComplete="new-password" 
+                                    placeholder="Min. 6 characters" 
+                                    className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                                    value={password} 
+                                    onChange={e => setPassword(e.target.value)} 
+                                    required 
+                                />
+                            </div>
+
+                            {/* ✅ ช่องกรอกรหัสผ่าน 2 (Confirm Password) */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase">ยืนยันรหัสผ่านอีกครั้ง</label>
+                                <input 
+                                    type="password" 
+                                    autoComplete="new-password" 
+                                    placeholder="Confirm your password" 
+                                    className={`w-full px-4 py-3 border rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 outline-none transition-all ${confirmPassword && password !== confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 dark:border-slate-700 focus:ring-blue-500'}`} 
+                                    value={confirmPassword} 
+                                    onChange={e => setConfirmPassword(e.target.value)} 
+                                    required 
+                                />
+                                {confirmPassword && password !== confirmPassword && (
+                                    <p className="text-[10px] text-red-500 mt-1 font-bold italic">รหัสผ่านไม่ตรงกัน</p>
+                                )}
+                            </div>
                             
                             <div className="h-32 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed shadow-inner scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"><pre className="whitespace-pre-wrap font-sans">{CONSENT_TEXT}</pre></div>
                             <label className="flex items-start gap-3 cursor-pointer p-1 group">
