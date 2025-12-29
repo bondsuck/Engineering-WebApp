@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabaseClient'; 
-import posthog from 'posthog-js'; // ✅ 1. อย่าลืม Import PostHog
+import posthog from 'posthog-js';
 
 // Pages
 import Dashboard from './pages/Dashboard'; 
@@ -12,7 +12,6 @@ import Login from './pages/Login';
 import RCBeamDesignTool from './tools/RCBeamDesignTool'; 
 import RCColumnDesignTool from './tools/RCColumnDesignTool';
 import PileCapDesignTool from './tools/PileCapDesignTool';
-// ... imports เดิม
 import RCSlabDesignTool from './tools/RCSlabDesignTool';
 import IsolatedFootingTool from './tools/IsolatedFootingTool';
 import StaircaseDesignTool from './tools/StaircaseDesignTool';
@@ -23,45 +22,77 @@ const App = () => {
     const [isPro, setIsPro] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
+    // 🔒 ฟังก์ชันความปลอดภัย: เช็คว่า User ยังมีตัวตนจริงๆ ใน Server ไหม?
+    const validateUserSession = async () => {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+            console.warn("Security Alert: User not found or token invalid. Forcing logout.");
+            await supabase.auth.signOut();
+            setSession(null);
+            setIsPro(false);
+            return null;
+        }
+        return user;
+    };
+
     useEffect(() => {
-        // ✅ 2. Initialize PostHog (โค้ดส่วนนี้หายไปครับ ผมเติมให้แล้ว)
+        // 1. Initialize PostHog
         posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
             api_host: import.meta.env.VITE_POSTHOG_HOST,
             person_profiles: 'identified_only',
             capture_pageview: false 
         });
 
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session) {
-                checkProStatus(session.user.id);
-                identifyPostHogUser(session.user); // ✅ Identify User
+        // 2. Start Session Check
+        const initSession = async () => {
+            setIsLoading(true);
+            
+            // เช็ค Session ในเครื่องก่อน (เร็ว)
+            const { data: { session: localSession } } = await supabase.auth.getSession();
+            
+            if (localSession) {
+                // ถ้ามี Session -> ยิงไปเช็คกับ Server อีกที (ช้ากว่านิดนึงแต่ชัวร์)
+                const validUser = await validateUserSession();
+                
+                if (validUser) {
+                    setSession(localSession);
+                    checkProStatus(validUser.id);
+                    identifyPostHogUser(validUser);
+                }
             } else {
-                setIsLoading(false);
+                setIsLoading(false); // ไม่มี Session เลิกโหลดเลย
             }
-        });
+            
+            // จบการโหลด (กรณีมี validUser จะไปจบใน checkProStatus หรือจบตรงนี้ถ้าไม่มี)
+            if (!localSession) setIsLoading(false);
+        };
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            if (session) {
-                checkProStatus(session.user.id);
-                identifyPostHogUser(session.user); // ✅ Identify User
-            } else {
+        initSession();
+
+        // 3. Listen for Auth Changes (Login/Logout)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT') {
+                setSession(null);
                 setIsPro(false);
+                posthog.reset();
                 setIsLoading(false);
-                posthog.reset(); // ✅ Reset PostHog เมื่อ Logout
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                 if (session) {
+                    setSession(session);
+                    checkProStatus(session.user.id);
+                    identifyPostHogUser(session.user);
+                 }
             }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    // ✅ ฟังก์ชันช่วยส่งข้อมูลให้ PostHog
     const identifyPostHogUser = (user: any) => {
         if (user) {
             posthog.identify(user.id, {
                 email: user.email,
-                is_pro: isPro // ส่งสถานะ Pro ไปด้วย
+                is_pro: isPro
             });
         }
     };
@@ -73,29 +104,19 @@ const App = () => {
                 .select('subscription_plan')
                 .eq('id', userId)
                 .single();
-                
-            // ❌ แบบเก่า (ที่ Error):
-            //const isUserPro = data && data.subscription_plan === 'pro'; 
-
-            // ✅ แบบใหม่ (แก้แล้ว): ใช้ ?. จะได้ค่า true/false เสมอ ไม่หลุด null
-            const isUserPro = data?.subscription_plan === 'pro';
-
-            setIsPro(isUserPro);
             
-            // อัปเดตสถานะใน PostHog
+            const isUserPro = data?.subscription_plan === 'pro';
+            setIsPro(isUserPro);
             posthog.people.set({ plan: isUserPro ? 'pro' : 'free' });
-
         } catch (error) {
             console.error("Error fetching pro status:", error);
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // โหลดเสร็จแน่นอน
         }
     };
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        setIsPro(false);
-        posthog.reset();
     };
 
     if (isLoading) {
@@ -121,58 +142,14 @@ const App = () => {
                 <Routes>
                     <Route path="/" element={session ? <Dashboard /> : <Login />} />
                     
-                    {/* RC Beam Route */}
-                    <Route 
-                        path="/rc-beam" 
-                        element={session ? <RCBeamDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
-
-                    {/* RC Column Route */}
-                    <Route 
-                        path="/rc-column" 
-                        element={session ? <RCColumnDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
-
-                    {/* Pile Cap Route */}
-                    <Route 
-                        path="/pile-cap" 
-                        element={
-                            session ? (
-                                <PileCapDesignTool 
-                                    onBack={() => window.history.back()} 
-                                    isPro={isPro} 
-                                />
-                            ) : (
-                                <Navigate to="/" replace />
-                            )
-                        } 
-                    />
-                    {/* ✅ เพิ่ม RC Slab */}
-                    <Route 
-                        path="/rc-slab" 
-                        element={session ? <RCSlabDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
-
-                    {/* ✅ เพิ่ม Isolated Footing */}
-                    <Route 
-                        path="/isolated-footing" 
-                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/isolated-footing" ด้วยนะครับ (เดิมใน code อาจจะยังไม่มี path)
-                        element={session ? <IsolatedFootingTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
-
-                    {/* ✅ เพิ่ม Staircase */}
-                    <Route 
-                        path="/staircase" 
-                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/staircase" ด้วย
-                        element={session ? <StaircaseDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
-
-                    {/* ✅ เพิ่ม Retaining Wall */}
-                    <Route 
-                        path="/retaining-wall" 
-                        // หมายเหตุ: ใน Dashboard ต้องแก้ path เป็น "/retaining-wall" ด้วย
-                        element={session ? <RetainingWallTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} 
-                    />
+                    {/* Tools Routes */}
+                    <Route path="/rc-beam" element={session ? <RCBeamDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
+                    <Route path="/rc-column" element={session ? <RCColumnDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
+                    <Route path="/pile-cap" element={session ? <PileCapDesignTool onBack={() => window.history.back()} isPro={isPro} /> : <Navigate to="/" replace />} />
+                    <Route path="/rc-slab" element={session ? <RCSlabDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
+                    <Route path="/isolated-footing" element={session ? <IsolatedFootingTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
+                    <Route path="/staircase" element={session ? <StaircaseDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
+                    <Route path="/retaining-wall" element={session ? <RetainingWallTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
                 </Routes>
             </div>
         </BrowserRouter>
