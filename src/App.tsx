@@ -22,15 +22,15 @@ const App = () => {
     const [isPro, setIsPro] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
-    // 🛡️ ฟังก์ชันความปลอดภัย (แยกออกมาเพื่อให้ code อ่านง่าย)
+    // 🛡️ ฟังก์ชันความปลอดภัยที่เสถียรขึ้น
     const validateUserIntegrity = async (currentSession: Session) => {
         try {
             console.log("Checking User Integrity...");
-            // 1. เช็ค Auth User
+            // 1. เช็ค Auth User จาก Server โดยตรง (ไม่ผ่าน cache)
             const { data: { user }, error: authError } = await supabase.auth.getUser();
             if (authError || !user) throw new Error("Auth User missing");
 
-            // 2. เช็ค Profile
+            // 2. เช็ค Profile ว่ายังไม่โดนลบ
             const { data: profile, error: profileError } = await supabase
                 .from('user_profiles')
                 .select('subscription_plan')
@@ -44,33 +44,27 @@ const App = () => {
 
         } catch (error) {
             console.warn("Validation Failed:", error);
-            // ถ้าเช็คไม่ผ่าน ให้ Logout ทิ้ง
+            // ถ้าเช็คแล้ว "ไม่มีตัวตนจริง" ถึงค่อยสั่ง Logout
             await handleLogout();
             return null;
         }
     };
 
-    // 🔥 แก้ไขใหม่: ล้างทุกอย่างให้เกลี้ยง เพื่อแก้ปัญหา F5 แล้วเด้งกลับมา
+    // 🔥 ปรับ handleLogout ให้ "สุภาพ" ขึ้น ไม่ล้าง localStorage ทั้งหมด 
+    // เพื่อให้ Browser ยังพอจำ session สำคัญตอน Refresh ได้
     const handleLogout = async () => {
-        console.log("Logging out and force clearing storage...");
-        
-        // 1. ล้าง State หน้าจอ
+        console.log("Logging out...");
         setSession(null);
         setIsPro(false);
         posthog.reset();
         
-        // 2. 🧹 ล้างกุญแจใน Browser ทิ้งให้หมด (สำคัญมาก)
-        localStorage.clear(); 
-        sessionStorage.clear();
-
-        // 3. สั่ง Supabase ให้จบงาน
+        // ลบเฉพาะกุญแจของ Supabase (ถ้ามี)
         await supabase.auth.signOut();
-
-        // 4. 🚀 บังคับรีเฟรชหน้าเว็บใหม่ เพื่อเริ่มระบบแบบสะอาด 100%
-        window.location.replace('/');
+        
+        // ไม่ต้องใช้ window.location.replace('/') เพื่อกันหน้าจอวูบวาบตอน Refresh
     };
 
-    // 🚀 Effect หลัก: ทำงานครั้งเดียวตอนเข้าเว็บ
+    // 🚀 Effect หลัก
     useEffect(() => {
         let mounted = true;
 
@@ -85,22 +79,22 @@ const App = () => {
             } catch (e) { console.error("PostHog Init Error", e); }
         }
 
-        // 2. ฟังก์ชันเริ่มระบบ
         const initializeApp = async () => {
             try {
-                // เช็ค Session ในเครื่องก่อน
+                // 🔍 จุดสำคัญ: ใช้ getSession เพื่อดึงสถานะเดิมกลับมาให้ไวที่สุดตอน F5
                 const { data: { session: localSession } } = await supabase.auth.getSession();
                 
                 if (localSession && mounted) {
-                    // ถ้ามี Session ให้ Validate กับ Server
+                    // ตั้งค่า session เบื้องต้นทันทีเพื่อไม่ให้หน้าจอเด้งไปหน้า Login
+                    setSession(localSession);
+                    
+                    // แล้วค่อยตรวจสอบความถูกต้องเบื้องหลัง
                     const validData = await validateUserIntegrity(localSession);
                     
                     if (validData && mounted) {
-                        setSession(localSession);
                         const isUserPro = validData.profile.subscription_plan === 'pro';
                         setIsPro(isUserPro);
                         
-                        // Track User
                         if (import.meta.env.VITE_POSTHOG_KEY) {
                             posthog.identify(validData.user.id, { 
                                 email: validData.user.email, 
@@ -112,29 +106,27 @@ const App = () => {
             } catch (error) {
                 console.error("App Init Error:", error);
             } finally {
-                if (mounted) setIsLoading(false); // ✅ สั่งหยุดโหลดเสมอ
+                if (mounted) setIsLoading(false);
             }
         };
 
         initializeApp();
 
-        // 3. 🚨 SAFETY VALVE: วาล์วนิรภัย (กันหน้าจอค้างหมุนติ้ว)
+        // 🚨 SAFETY VALVE: บังคับหยุดโหลด
         const safetyTimer = setTimeout(() => {
             if (mounted && isLoading) {
-                console.warn("Forcing loading stop (Timeout)");
                 setIsLoading(false);
             }
         }, 3000);
 
-        // 4. Listener สำหรับการ Login/Logout ภายหลัง
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // 4. Listener สำหรับดักจับการ Login/Logout
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
             if (event === 'SIGNED_OUT') {
                 setSession(null);
                 setIsPro(false);
-            } else if (event === 'SIGNED_IN' && session) {
-                setSession(session);
-                // เช็ค Profile อีกรอบตอน Login สำเร็จ
-                const validData = await validateUserIntegrity(session);
+            } else if (event === 'SIGNED_IN' && newSession) {
+                setSession(newSession);
+                const validData = await validateUserIntegrity(newSession);
                 if (validData) {
                     setIsPro(validData.profile.subscription_plan === 'pro');
                 }
@@ -152,7 +144,7 @@ const App = () => {
         return (
             <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center gap-4">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-                <p className="text-slate-400 text-sm animate-pulse">Loading System...</p>
+                <p className="text-slate-400 text-sm animate-pulse">Checking access...</p>
             </div>
         );
     }
@@ -170,9 +162,9 @@ const App = () => {
                 )}
 
                 <Routes>
+                    {/* ใช้ session เป็นตัวตัดสินหลักเพื่อความนิ่งตอน Refresh */}
                     <Route path="/" element={session ? <Dashboard /> : <Login />} />
                     
-                    {/* Tools Routes */}
                     <Route path="/rc-beam" element={session ? <RCBeamDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
                     <Route path="/rc-column" element={session ? <RCColumnDesignTool isPro={isPro} onBack={() => window.history.back()} /> : <Navigate to="/" replace />} />
                     <Route path="/pile-cap" element={session ? <PileCapDesignTool onBack={() => window.history.back()} isPro={isPro} /> : <Navigate to="/" replace />} />
